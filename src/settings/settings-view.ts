@@ -13,10 +13,11 @@ import { language } from "../core/i18n.ts";
 import type { AlertMood, AlertPlace, FocusSettings } from "../core/settings.ts";
 import { TONES, playTone } from "../focus/tones.ts";
 import { DOCK_PAGES } from "../core/settings.ts";
+import { geocodeUrl, parsePlaces, type Place } from "../day/weather.ts";
 import type { Page } from "../core/island-state.ts";
 import { BUILT_PHASE, ITEMS, type ItemId, type ItemPrefs } from "../items/registry.ts";
 
-type Tab = "assistant" | "claude" | "focus" | "notifications" | "island";
+type Tab = "assistant" | "claude" | "focus" | "day" | "notifications" | "island";
 
 const SECRET: Record<Provider, SecretName> = { claude: "anthropic", gemini: "gemini" };
 const AI: { id: Provider; name: string; keyHint: string; model: string; cli: string }[] = [
@@ -26,7 +27,7 @@ const AI: { id: Provider; name: string; keyHint: string; model: string; cli: str
 
 export class SettingsView {
   readonly el = el("div", "settings");
-  private tab: Tab = "assistant";
+  tab: Tab = "assistant";
   private hasKey: Partial<Record<Provider, boolean>> = {};
 
   constructor(
@@ -56,7 +57,7 @@ export class SettingsView {
 
   paint() {
     const tabs = el("div", "set-tabs");
-    for (const [id, label] of [["assistant", "Assistant"], ["claude", "Claude Code"], ["focus", "Focus"], ["notifications", "Notifications"], ["island", "Island"]] as [Tab, string][]) {
+    for (const [id, label] of [["assistant", "Assistant"], ["claude", "Claude Code"], ["focus", "Focus"], ["day", "The day"], ["notifications", "Notifications"], ["island", "Island"]] as [Tab, string][]) {
       const b = el("button", `set-tab${this.tab === id ? " on" : ""}`, t(label));
       b.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -69,6 +70,7 @@ export class SettingsView {
     if (this.tab === "assistant") this.assistant(body);
     else if (this.tab === "claude") this.claudeCode(body);
     else if (this.tab === "focus") this.focus(body);
+    else if (this.tab === "day") this.dayTab(body);
     else if (this.tab === "notifications") this.notifications(body);
     else this.island(body);
     this.el.replaceChildren(tabs, body);
@@ -249,6 +251,106 @@ export class SettingsView {
       this.row(t("Ring until dismissed"), onOff(a.repeat, (v) => setA({ repeat: v }))),
     );
     body.append(card);
+  }
+
+  private places: Place[] = [];
+  private placeError = "";
+  private city = el("input", "set-input");
+  private calendar = el("input", "set-input");
+
+  private dayTab(body: HTMLElement) {
+    const s = this.settings();
+    const d = s.day;
+    const setD = (p: Partial<typeof d>) => this.change({ day: { ...d, ...p } });
+
+    const weather = el("div", "set-box");
+    weather.append(el("div", "set-title", t("Weather")));
+    this.city.placeholder = d.place?.label ?? t("Your city");
+    typing(this.city, this.hold);
+    const search = el("button", "set-btn", t("Search"));
+    const find = async () => {
+      const q = this.city.value.trim();
+      if (!q) return;
+      if (!IN_APP) {
+        this.places = [{ name: q, label: `${q}, Brasil`, lat: -23.5, lon: -46.6 }];
+      } else {
+        const r = await Bridge.fetchText(geocodeUrl(q));
+        this.placeError = "error" in r ? r.error : "";
+        this.places = "error" in r ? [] : parsePlaces(r.ok);
+        if (!this.places.length && !this.placeError) this.placeError = t("No city with that name.");
+      }
+      this.paint();
+    };
+    search.addEventListener("click", (e) => {
+      e.stopPropagation();
+      void find();
+    });
+    this.city.onkeydown = (e) => {
+      if (e.key === "Enter") void find();
+    };
+    weather.append(this.row(t("City"), this.city, search));
+    if (d.place) weather.append(el("p", "set-note", t("Now: {place}", { place: d.place.label })));
+    if (this.placeError) weather.append(el("p", "set-note error", this.placeError));
+    if (this.places.length) {
+      const list = el("div", "set-chips");
+      for (const p of this.places) {
+        const b = el("button", "chip", p.label);
+        b.addEventListener("click", (e) => {
+          e.stopPropagation();
+          setD({ place: p });
+          this.places = [];
+          this.city.value = "";
+          this.paint();
+        });
+        list.append(b);
+      }
+      weather.append(list);
+    }
+    weather.append(el("p", "set-note", t("From Open-Meteo: free, no account, only the city's position is sent.")));
+    body.append(weather);
+
+    const cal = el("div", "set-box");
+    cal.append(el("div", "set-title", t("Calendars")));
+    for (const u of d.calendars) {
+      const row = el("div", "f-link");
+      const del = el("button", "set-btn quiet", t("Remove"));
+      del.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setD({ calendars: d.calendars.filter((x) => x !== u) });
+        this.paint();
+      });
+      row.append(el("span", "f-link-name", u), del);
+      cal.append(row);
+    }
+    this.calendar.placeholder = "https://calendar.google.com/calendar/ical/…/basic.ics";
+    typing(this.calendar, this.hold);
+    const add = el("button", "set-btn", t("Add"));
+    add.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const v = this.calendar.value.trim();
+      const ok = /^(https|webcal):\/\//.test(v);
+      this.calendar.classList.toggle("bad", !ok);
+      if (!ok) return;
+      setD({ calendars: [...d.calendars, v] });
+      this.calendar.value = "";
+      this.paint();
+    });
+    cal.append(this.row(t("Link (.ics)"), this.calendar, add));
+    cal.append(el("p", "set-note", t("Google Calendar: Settings → your calendar → Secret address in iCal format. Outlook: Publish calendar → ICS.")));
+    body.append(cal);
+
+    const w = d.water;
+    const setW = (p: Partial<typeof w>) => setD({ water: { ...w, ...p } });
+    const water = el("div", "set-box");
+    water.append(el("div", "set-title", t("Water")));
+    water.append(
+      this.row(t("Reminders"), this.segmented(w.on ? "on" : "off", [["on", t("On")], ["off", t("Off")]], (v) => setW({ on: v === "on" }))),
+      this.row(t("Daily goal"), this.number(w.goal, 250, 6000, (v) => setW({ goal: v }), "ml")),
+      this.row(t("A glass"), this.number(w.cup, 50, 1000, (v) => setW({ cup: v }), "ml")),
+      this.row(t("Every"), this.number(w.every, 10, 360, (v) => setW({ every: v }), "min")),
+      this.row(t("From"), this.number(w.from, 0, 23, (v) => setW({ from: v }), "h"), el("span", "set-unit", t("to")), this.number(w.to, 1, 24, (v) => setW({ to: v }), "h")),
+    );
+    body.append(water);
   }
 
   private claudeCode(body: HTMLElement) {

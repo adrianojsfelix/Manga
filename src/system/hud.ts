@@ -12,9 +12,10 @@ export type HudItem =
   | { kind: "lock"; key: keyof Locks; on: boolean }
   | { kind: "shot"; shot: Shot }
   | { kind: "done"; download: Download; folder: string }
-  | { kind: "ring"; ring: Ring; color: string; act: (id: string) => void };
+  | { kind: "ring"; ring: Ring; color: string; act: (id: string) => void }
+  | { kind: "water"; text: string; drink: () => void };
 
-const SECONDS: Record<HudItem["kind"], number> = { lock: 1.6, shot: 6, done: 6, ring: 60 };
+const SECONDS: Record<HudItem["kind"], number> = { lock: 1.6, shot: 6, done: 6, ring: 60, water: 12 };
 
 export class Hud {
   readonly el = el("div", "hud");
@@ -89,6 +90,28 @@ export class Hud {
         });
         row.append(b);
       });
+      text.append(row);
+      this.el.append(this.ringFace ?? el("span"), text);
+      return;
+    }
+    if (h.kind === "water") {
+      const text = el("div", "hud-text");
+      text.append(el("b", "", t("Time for some water!")), el("span", "", h.text));
+      const row = el("div", "hud-row");
+      const yes = el("button", "hud-btn main", t("I drank a glass"));
+      yes.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.current = null;
+        h.drink();
+        this.changed();
+      });
+      const later = el("button", "hud-btn", t("Later"));
+      later.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.current = null;
+        this.changed();
+      });
+      row.append(yes, later);
       text.append(row);
       this.el.append(this.ringFace ?? el("span"), text);
       return;

@@ -36,6 +36,10 @@ import { I } from "./icons.ts";
 import { SettingsView } from "../settings/settings-view.ts";
 import { SystemView } from "../sysinfo/system-view.ts";
 import { ToolsView } from "../tools/tools-view.ts";
+import { DayStore } from "../day/store.ts";
+import { TodayView, when } from "../day/today-view.ts";
+import { NotesView } from "../day/notes-view.ts";
+import { sky } from "../day/weather.ts";
 import { Canvas, el, icon } from "./dom.ts";
 
 export interface Look {
@@ -129,6 +133,9 @@ export class Island {
     this.sys = s;
   });
   private toolsView: ToolsView;
+  readonly day: DayStore;
+  private todayView: TodayView;
+  private notesView: NotesView;
   private liveRect = "";
   readonly focus: FocusEngine;
   private focusView: FocusView;
@@ -220,6 +227,39 @@ export class Island {
     on<{ action: string }>("rest-action", () => {
       this.restShown = 0;
       this.focus.skip();
+    });
+    this.day = new DayStore(
+      () => this.settings.day,
+      () => {
+        const w = this.day.waterNow;
+        this.kumo.flash("happy", 2);
+        this.hud.show({
+          kind: "water",
+          text: t("{ml} ml of {goal} ml today.", { ml: w.ml, goal: this.settings.day.water.goal }),
+          drink: () => {
+            this.day.drink();
+            this.kumo.flash("love", 1.6);
+          },
+        });
+      },
+    );
+    this.todayView = new TodayView(
+      this.day,
+      () => this.settings.day.place?.name ?? "",
+      () => {
+        this.settingsView.tab = "day";
+        this.dispatch({ type: "open", page: "settings" });
+      },
+      () => {
+        this.notesView.tab = "tasks";
+        this.dispatch({ type: "open", page: "notes" });
+      },
+      hold("today"),
+    );
+    this.notesView = new NotesView(this.day, hold("notes"));
+    this.day.onChange(() => {
+      if (this.shownPage === "home") this.shownPage = null;
+      this.renderHead();
     });
     this.toolsView = new ToolsView(
       () => this.settings.tools,
@@ -342,6 +382,25 @@ export class Island {
     this.headTools.replaceChildren(...pages.map((id) => button(id, 15, "tool-btn")), button("settings", 15, "tool-btn"));
   }
 
+  /** What the items read: the battery, the count, the PC, the day. */
+  private itemContext(): ItemContext {
+    const w = this.day?.weather;
+    const next = this.day?.upcoming(2, 1)[0];
+    const water = this.day?.waterNow;
+    return {
+      battery: this.battery,
+      unread: this.unread,
+      sys: this.sys,
+      day: {
+        temp: w?.temp,
+        icon: w ? sky(w.code, w.isDay).icon : undefined,
+        next: next ? `${when(next)} ${next.title}`.slice(0, 40) : undefined,
+        ml: water?.ml,
+        goal: this.settings.day.water.on ? this.settings.day.water.goal : undefined,
+      },
+    };
+  }
+
   /** The small island: its middle, and what each side shows now. */
   private renderSmall() {
     const s = this.settings.island;
@@ -355,7 +414,7 @@ export class Island {
     }
     this.smallCenter.className = `small-center c-${s.center}`;
     if (this.state.size !== "small") return;
-    const ctx: ItemContext = { battery: this.battery, unread: this.unread, sys: this.sys };
+    const ctx = this.itemContext();
     const item = (i: number): Node | null => {
       const id = this.items.small[i];
       if (!id || id === "notifications") return null;
@@ -635,6 +694,7 @@ export class Island {
     this.save(this.settings);
     if (p.notifications && p.notifications.on !== before.notifications.on) void Bridge.notificationsWatch(p.notifications.on);
     if (p.focus) this.focus.prefsChanged();
+    if (p.day && (p.day.place !== before.day.place || p.day.calendars !== before.day.calendars)) void this.day.refresh(true);
     if (p.island) {
       if (p.island.rest !== before.island.rest) this.dispatch({ type: "rest", size: p.island.rest });
       if (p.island.dock !== before.island.dock) this.renderDock();
@@ -675,8 +735,8 @@ export class Island {
     this.ask.paint();
     const k = Math.min(1.4, Math.max(0.8, i.scale));
     this.hud.paint();
-    if (this.hud.current?.kind === "ring") {
-      // A ringing alarm shows even on an open island.
+    if (this.hud.current?.kind === "ring" || this.hud.current?.kind === "water") {
+      // A ringing alarm (and the water reminder) shows even on an open island.
       const width = Math.max(box.width, Math.round(NOTICE_WIDTH * k));
       this.hud.el.style.width = `${width}px`;
       return { ...box, width, height: Math.max(this.hud.el.offsetHeight, 96), radius: Math.round(24 * k) };
@@ -703,7 +763,7 @@ export class Island {
     const asking = this.ask.current != null;
     const overlay = asking
       ? " asking"
-      : this.hud.current && (s.size !== "extended" || this.hud.current.kind === "ring")
+      : this.hud.current && (s.size !== "extended" || this.hud.current.kind === "ring" || this.hud.current.kind === "water")
         ? ` hudding hud-${this.hud.current.kind}`
         : this.banner.current && s.size !== "extended"
           ? " noticing"
@@ -761,7 +821,7 @@ export class Island {
       if (this.shownDownload()) this.headItems.append(this.ring);
       const busy = this.sessions.filter((x) => x.state === "working");
       if (busy.length) this.headItems.append(el("span", "head-item item-cc", busy.length > 1 ? t("{n} sessions", { n: busy.length }) : busy[0].project));
-      const ctx: ItemContext = { battery: this.battery, unread: this.unread, sys: this.sys };
+      const ctx = this.itemContext();
       for (const id of this.items.medium) {
         if (id === "clock" || id === "date") continue;
         if (id === "notifications") {
@@ -847,6 +907,17 @@ export class Island {
       void this.controlsView.open();
       return;
     }
+    if (page.id === "today") {
+      this.todayView.paint();
+      this.page.append(this.todayView.el);
+      void this.day.refresh();
+      return;
+    }
+    if (page.id === "notes") {
+      this.notesView.paint();
+      this.page.append(this.notesView.el);
+      return;
+    }
     if (page.id === "system") {
       this.page.append(this.systemView.el);
       this.systemView.open();
@@ -926,7 +997,7 @@ export class Island {
       }
       if (this.state.size === "extended" && this.state.page === "media") this.mediaView.frame();
       if (this.state.size === "extended" && this.state.page === "focus") this.focusView.frame();
-      if (this.hud.current?.kind === "ring") this.ringFace.draw();
+      if (this.hud.current?.kind === "ring" || this.hud.current?.kind === "water") this.ringFace.draw();
       const fs = this.focus.state;
       if (fs.running) {
         const txt = focusClock(focusShown(fs, Date.now()));

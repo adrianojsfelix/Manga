@@ -1,6 +1,8 @@
 import { DEFAULT_PREFS, sanitizePrefs, type FocusPrefs } from "../focus/timer.ts";
 import type { Page, Rest } from "./island-state.ts";
 import { DEFAULT_FEEDS } from "../tools/feeds.ts";
+import { DEFAULT_WATER, sanitizeWater, type WaterPrefs } from "../day/day.ts";
+import type { Place } from "../day/weather.ts";
 
 // What the user sets, saved in the page's storage (never the API keys: those
 // go to Windows' Credential Manager through Rust). Pure: tested on its own.
@@ -45,6 +47,13 @@ export interface Settings {
   };
   /** The control center's buttons, in order. */
   controls: string[];
+  day: {
+    /** The weather's city. */
+    place: Place | null;
+    /** Calendars' .ics links. */
+    calendars: string[];
+    water: WaterPrefs;
+  };
   tools: {
     /** News feeds (RSS). */
     feeds: string[];
@@ -122,6 +131,7 @@ export const DEFAULT_SETTINGS: Settings = {
   claudeCode: { ask: true },
   island: { shape: "notch", rest: "small", scale: 1, center: "clock", dock: ["home", "assistant", "media", "focus", "controls", "system", "tools", "today"] },
   controls: DEFAULT_CONTROLS,
+  day: { place: null, calendars: [], water: DEFAULT_WATER },
   tools: { feeds: DEFAULT_FEEDS, pins: [] },
 };
 
@@ -132,6 +142,11 @@ function ai(raw: unknown, fallback: AiPrefs): AiPrefs {
     mode: r.mode === "subscription" || r.mode === "key" ? r.mode : fallback.mode,
     model: typeof r.model === "string" ? r.model.trim().slice(0, 80) : fallback.model,
   };
+}
+
+function placeOf(v: unknown): Place | null {
+  const p = obj(v);
+  return typeof p.name === "string" && typeof p.lat === "number" && typeof p.lon === "number" ? { name: p.name, label: typeof p.label === "string" ? p.label : p.name, lat: p.lat, lon: p.lon } : null;
 }
 
 function strings(v: unknown, def: string[]): string[] {
@@ -157,6 +172,11 @@ export function sanitizeSettings(raw: unknown): Settings {
     focus: sanitizeFocus(r.focus),
     claudeCode: { ask: typeof obj(r.claudeCode).ask === "boolean" ? (obj(r.claudeCode).ask as boolean) : d.claudeCode.ask },
     controls: Array.isArray(r.controls) ? [...new Set(r.controls.filter((c): c is string => typeof c === "string"))].slice(0, 30) : d.controls,
+    day: {
+      place: placeOf(obj(r.day).place),
+      calendars: strings(obj(r.day).calendars, []).filter((u) => /^(https|webcal):\/\//.test(u)),
+      water: sanitizeWater(obj(r.day).water),
+    },
     tools: {
       feeds: strings(obj(r.tools).feeds, d.tools.feeds),
       pins: strings(obj(r.tools).pins, d.tools.pins),

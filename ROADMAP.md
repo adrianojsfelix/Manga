@@ -69,10 +69,15 @@ Cada fase termina com o app funcionando, testado e checado contra o Windows.
   notícias (RSS) e pastas do Pinterest.
 
 ## Fase 5 — O dia
-- Página **Hoje**: notificações, o que toca, próximo evento, tarefas, água.
-- **Relógio** (e outras cidades), **clima** (agora, próximas horas, semana),
-  **calendário** (eventos e agendas .ics, como o Google Agenda),
-  **notas**, **tarefas** com lembrete, **beber água** com meta e lembretes.
+- ✅ Página **Hoje**: clima com os próximos dias, agenda da semana, tarefas e
+  a água do dia.
+- ✅ **Clima** pelo Open-Meteo (grátis, sem conta), cidade escolhida por nome.
+- ✅ **Agendas .ics** (Google Agenda, Outlook…), com eventos que se repetem.
+- ✅ **Notas** e **tarefas** com data (atrasadas em vermelho).
+- ✅ **Beber água** com meta, tamanho do copo, intervalo e horário dos
+  lembretes, e o Manga lembrando.
+- ✅ Itens da barra: clima, próximo evento, água.
+- Depois: relógio de outras cidades, previsão por hora, lembrete de tarefas.
 
 ## Fase 6 — O Windows na ilha
 - **Lixeira** (quantos itens, abrir, esvaziar).

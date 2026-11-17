@@ -36,7 +36,7 @@ export const ITEMS: readonly ItemDef[] = [
 ];
 
 /** The phase this build has reached: items beyond it are not drawn yet. */
-export const BUILT_PHASE = 4;
+export const BUILT_PHASE = 5;
 
 export interface ItemPrefs {
   /** Shown in the small island (at most two). */
@@ -45,7 +45,7 @@ export interface ItemPrefs {
   medium: ItemId[];
 }
 
-export const DEFAULT_ITEMS: ItemPrefs = { small: ["notifications", "battery"], medium: ["date", "clock", "countdown", "waves", "notifications", "battery"] };
+export const DEFAULT_ITEMS: ItemPrefs = { small: ["notifications", "battery"], medium: ["date", "clock", "weather", "countdown", "waves", "notifications", "battery"] };
 
 const IDS = new Set(ITEMS.map((i) => i.id));
 
@@ -72,6 +72,8 @@ export interface ItemContext {
   unread?: number;
   /** The PC's numbers, when read. */
   sys?: { cpu: number; ramUsed: number; ramTotal: number; down: number; up: number } | null;
+  /** The day: the weather now, the next event, the water. */
+  day?: { temp?: number; icon?: string; next?: string; ml?: number; goal?: number };
 }
 
 function rate(b: number): string {
@@ -91,6 +93,12 @@ export function itemView(id: ItemId, now: Date, ctx: ItemContext = {}): ItemView
       if (!b) return null;
       return { text: `${b.charging ? "⚡" : ""}${Math.round(b.level * 100)}%` };
     }
+    case "weather":
+      return ctx.day?.temp != null ? { text: `${ctx.day.icon ?? ""} ${ctx.day.temp}°`.trim() } : null;
+    case "event":
+      return ctx.day?.next ? { text: ctx.day.next } : null;
+    case "water":
+      return ctx.day?.goal ? { text: `💧 ${Math.round(((ctx.day.ml ?? 0) / ctx.day.goal) * 100)}%` } : null;
     case "cpu":
       return ctx.sys ? { text: `CPU ${Math.round(ctx.sys.cpu)}%` } : null;
     case "ram":
