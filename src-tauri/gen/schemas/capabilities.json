@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"What the island's page may do.","local":true,"windows":["island"],"permissions":["core:default"]}}
+{"default":{"identifier":"default","description":"What Manga's pages (the island, the picture-in-picture) may do.","local":true,"windows":["island","pip"],"permissions":["core:default","core:window:allow-start-dragging","core:window:allow-close"]}}

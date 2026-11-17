@@ -47,7 +47,34 @@ export const Bridge = {
   ccStatus: () => call<CcStatus>("claude_code_status"),
   /** Adds (or takes out) Manga's hooks in Claude Code's settings.json. */
   ccConnect: (on: boolean) => invokeOrError<CcStatus>("claude_code_connect", { on }),
+  /** What plays: "play_pause" | "next" | "previous" | "seek" (position in seconds). */
+  mediaControl: (action: "play_pause" | "next" | "previous" | "seek", position?: number) => call<boolean>("media_control", { action, position }),
+  soundGet: () => call<Sound>("sound_get"),
+  soundSet: (what: "volume" | "mute" | "mic_mute" | "app_volume" | "app_mute", value: number, pid?: number) => call<boolean>("sound_set", { what, value, pid }),
+  /** How loud it plays now, 0–1. */
+  soundLevel: () => call<number>("sound_level"),
+  radiosGet: () => call<{ kind: "wifi" | "bluetooth"; on: boolean }[]>("radios_get"),
+  radioSet: (kind: "wifi" | "bluetooth", on: boolean) => call<boolean>("radio_set", { kind, on }),
+  brightnessGet: () => call<number | null>("brightness_get"),
+  brightnessSet: (value: number) => call<boolean>("brightness_set", { value }),
+  pipWindows: () => call<PipSource[]>("pip_windows"),
+  pipOpen: (source?: number) => invokeOrError<PipSource>("pip_open", { source: source ?? null }),
+  pipClose: () => call<void>("pip_close"),
 };
+
+export interface Sound {
+  /** 0–1; -1 without an output device. */
+  volume: number;
+  muted: boolean;
+  micMuted: boolean | null;
+  apps: { pid: number; name: string; volume: number; muted: boolean; active: boolean }[];
+}
+
+export interface PipSource {
+  id: number;
+  title: string;
+  app: string;
+}
 
 export type CcAnswer =
   | { choice: "allow" | "terminal" }

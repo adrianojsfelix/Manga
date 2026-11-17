@@ -10,8 +10,11 @@
 
 import { ChatView } from "../assistant/chat-view.ts";
 import { AskView } from "../claude-code/ask-view.ts";
+import { ControlsView } from "../controls/controls-view.ts";
+import { bars, subtitle, tintOf, type Media } from "../media/media.ts";
+import { MediaView } from "../media/media-view.ts";
 import { apply, project, type CcAsk, type CcEvent, type Session } from "../claude-code/sessions.ts";
-import { Bridge, on } from "../core/bridge.ts";
+import { Bridge, IN_APP, on } from "../core/bridge.ts";
 import { borderRadius, earSize, islandBox, windowSize, type Box } from "../core/geometry.ts";
 import { FOLD_AFTER_MS, INITIAL, next, type IslandEvent, type IslandState, type Page } from "../core/island-state.ts";
 import { language, t } from "../core/i18n.ts";
@@ -99,6 +102,15 @@ export class Island {
   /** What holds the island open: the pin, a text field in use. */
   private holds = new Set<string>();
   private ask: AskView;
+  private media: Media | null = null;
+  private mediaReadAt = 0;
+  private level = 0;
+  private coverTint: { cover: string; tint: string | null } = { cover: "", tint: null };
+  private mediaView: MediaView;
+  private controlsView: ControlsView;
+  private miniCover = el("span", "mini-cover");
+  private wavesSmall = new Canvas(22, 16, "mini-waves", (x) => this.drawWaves(x, 22, 16, 4));
+  private wavesHead = new Canvas(20, 14, "head-waves", (x) => this.drawWaves(x, 20, 14, 4));
   private sessions: Session[] = [];
   private shownPage: Page | null = null;
 
@@ -116,10 +128,15 @@ export class Island {
     const change = (p: Partial<Settings>) => this.change(p);
     this.chat = new ChatView(this.kumo, () => this.settings, change, hold("chat"));
     this.ask = new AskView(() => this.render(), hold("ask"));
+    this.mediaView = new MediaView(() => ({ m: this.media, readAt: this.mediaReadAt }));
+    this.controlsView = new ControlsView(
+      () => this.settings.notifications.quiet,
+      (quiet) => this.change({ notifications: { ...this.settings.notifications, quiet } }),
+    );
     this.settingsView = new SettingsView(() => this.settings, change, () => this.recent, () => this.sessions, hold("settings"));
 
     const small = el("div", "small-face");
-    small.append(this.eyesBig.el);
+    small.append(this.miniCover, this.eyesBig.el, this.wavesSmall.el);
 
     const head = el("div", "head");
     const center = el("span", "head-center");
@@ -179,6 +196,8 @@ export class Island {
     });
 
     on<Notice>("notification", (n) => this.notify(n));
+    on<Media | null>("media", (m) => this.setMedia(m));
+    window.setInterval(() => void this.listen(), 80);
     on<CcEvent>("cc-event", (e) => this.claudeCode(e));
     on<CcAsk>("cc-ask", (a) => this.claudeAsks(a));
     on<number>("cc-ask-gone", (id) => this.ask.gone(id));
@@ -205,6 +224,12 @@ export class Island {
     const s = this.settings.notifications;
     if (!s.on || !shows(n, s.ignored)) return;
     this.recent = remember(this.recent, n);
+    if (s.quiet) {
+      // Do not disturb: in the list, quietly.
+      this.unread++;
+      this.renderHead();
+      return;
+    }
     if (!(this.state.size === "extended" && this.state.page === "settings")) this.unread++;
     if (this.state.size === "extended") {
       // Open on a page: a little bang from Kumo, the list has it.
@@ -216,6 +241,72 @@ export class Island {
     this.kumo.flash("surprised", 1.4);
     if (this.noticeTimer != null) window.clearTimeout(this.noticeTimer);
     this.noticeTimer = window.setTimeout(() => this.dropNotice(), s.seconds * 1000);
+    this.render();
+  }
+
+  /** What plays now (the page's console can call it too). */
+  setMedia(m: Media | null) {
+    const before = this.media;
+    this.media = m && m.title ? m : null;
+    this.mediaReadAt = Date.now();
+    if (this.media?.cover !== before?.cover) void this.readTint();
+    const same = before && this.media && before.title === this.media.title && before.playing === this.media.playing && before.cover === this.media.cover;
+    if (this.shownPage === "media" && !same) this.mediaView.paint();
+    if (this.shownPage === "home" && !same) this.shownPage = null;
+    if (!same) this.render();
+  }
+
+  /** How loud it plays, for the waves (only while something plays). */
+  private async listen() {
+    if (!this.media?.playing) {
+      this.level *= 0.8;
+      return;
+    }
+    const raw = IN_APP ? ((await Bridge.soundLevel()) ?? 0) : 0.45 + 0.35 * Math.abs(Math.sin(Date.now() / 900));
+    this.level = this.level * 0.5 + raw * 0.5;
+  }
+
+  private drawWaves(x: CanvasRenderingContext2D, w: number, h: number, n: number) {
+    const b = bars(this.level, Date.now() / 1000, n);
+    const gap = 2;
+    const bw = (w - gap * (n - 1)) / n;
+    x.fillStyle = "#ffd9b3";
+    b.forEach((v, i) => {
+      const bh = Math.max(2, v * h);
+      x.beginPath();
+      x.roundRect(i * (bw + gap), (h - bh) / 2, bw, bh, bw / 2);
+      x.fill();
+    });
+  }
+
+  /** The cover's average colour tints the open island, as glass. */
+  private async readTint() {
+    const cover = this.media?.cover ?? "";
+    if (!cover) {
+      this.coverTint = { cover: "", tint: null };
+      this.render();
+      return;
+    }
+    const img = new Image();
+    img.src = cover;
+    try {
+      await img.decode();
+      const c = document.createElement("canvas");
+      c.width = c.height = 8;
+      const x = c.getContext("2d")!;
+      x.drawImage(img, 0, 0, 8, 8);
+      const d = x.getImageData(0, 0, 8, 8).data;
+      let r = 0, g = 0, b = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        r += d[i];
+        g += d[i + 1];
+        b += d[i + 2];
+      }
+      const n = d.length / 4;
+      this.coverTint = { cover, tint: tintOf(r / n, g / n, b / n) };
+    } catch {
+      this.coverTint = { cover, tint: null };
+    }
     this.render();
   }
 
@@ -325,7 +416,12 @@ export class Island {
     this.shell.style.borderRadius = borderRadius(box, shape);
     this.shell.style.marginTop = `${box.gap}px`;
     this.shell.style.setProperty("--bg", look.color);
-    this.shell.style.setProperty("--tint", look.tint ?? "none");
+    const tint = look.tint ?? (s.size === "extended" && this.media ? this.coverTint.tint : null);
+    this.shell.style.setProperty("--tint", tint ?? "none");
+    const showsMedia = !!this.media?.playing && s.size === "small";
+    this.shell.classList.toggle("playing", showsMedia);
+    if (this.media?.cover) this.miniCover.style.backgroundImage = `url("${this.media.cover}")`;
+    else this.miniCover.style.backgroundImage = "";
     this.shell.style.setProperty("--ear", `${ear}px`);
     const win = windowSize(box);
     void Bridge.layout(win.width, win.height);
@@ -337,6 +433,7 @@ export class Island {
     if (s.size === "extended" && s.page === "settings") this.unread = 0;
     const open = s.size === "extended" ? s.page : null;
     if (open !== this.shownPage) {
+      if (this.shownPage === "controls") this.controlsView.close();
       this.shownPage = open;
       this.renderPage(page);
     }
@@ -367,6 +464,10 @@ export class Island {
       const ctx: ItemContext = { battery: this.battery, unread: this.unread };
       for (const id of this.items.medium) {
         if (id === "clock" || id === "date") continue;
+        if (id === "waves") {
+          if (this.media?.playing) this.headItems.append(this.wavesHead.el);
+          continue;
+        }
         const v = itemView(id, now, ctx);
         if (v) this.headItems.append(el("span", `head-item item-${id}`, v.text));
       }
@@ -401,7 +502,7 @@ export class Island {
               "settings",
             )
           : card("KUMO", t("Hi!"), t("Ask me anything"), "c-kumo", "assistant"),
-        card(t("NOW PLAYING"), t("Nothing playing"), t("Phase {n}", { n: 3 }), "c-media"),
+        this.mediaCard(card),
         last
           ? card(t("NOTIFICATIONS"), last.title || last.app, last.app, "c-focus c-notice", "settings")
           : card(t("FOCUS"), "25:00", t("Ready"), "c-focus"),
@@ -413,6 +514,16 @@ export class Island {
       this.chat.paint();
       this.page.append(this.chat.el);
       this.chat.focus();
+      return;
+    }
+    if (page.id === "media") {
+      this.mediaView.paint();
+      this.page.append(this.mediaView.el);
+      return;
+    }
+    if (page.id === "controls") {
+      this.page.append(this.controlsView.el);
+      void this.controlsView.open();
       return;
     }
     if (page.id === "settings") {
@@ -427,11 +538,25 @@ export class Island {
     this.page.append(wrap);
   }
 
+  private mediaCard(card: (label: string, big: string, small: string, cls: string, go?: Page) => HTMLElement) {
+    const m = this.media;
+    if (!m) return card(t("NOW PLAYING"), t("Nothing playing"), t("Any app"), "c-media", "media");
+    const c = card(m.playing ? t("NOW PLAYING") : t("PAUSED"), m.title, subtitle(m), "c-media has-media", "media");
+    if (m.cover) c.style.setProperty("--cover", `url("${m.cover}")`);
+    return c;
+  }
+
   private lastMinute = -1;
   private loop() {
     const frame = () => {
-      if (this.state.size === "small" && !this.notice) this.eyesBig.draw();
-      else this.eyesSmall.draw();
+      if (this.state.size === "small" && !this.notice) {
+        this.eyesBig.draw();
+        if (this.media?.playing) this.wavesSmall.draw();
+      } else {
+        this.eyesSmall.draw();
+        if (this.media?.playing) this.wavesHead.draw();
+      }
+      if (this.state.size === "extended" && this.state.page === "media") this.mediaView.frame();
       if (this.state.size === "extended" && this.state.page === "assistant") this.chat.frame();
       const m = new Date().getMinutes();
       if (m !== this.lastMinute) {

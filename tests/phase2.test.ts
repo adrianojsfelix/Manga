@@ -18,7 +18,7 @@ test("saved settings keep what is valid and fall back on the rest", () => {
   assert.equal(s.provider, "gemini");
   assert.deepEqual(s.ai.claude, { mode: "subscription", model: "claude-x" });
   assert.deepEqual(s.ai.gemini, { mode: "key", model: "" });
-  assert.deepEqual(s.notifications, { on: false, ignored: ["Teams"], seconds: 30 });
+  assert.deepEqual(s.notifications, { on: false, ignored: ["Teams"], seconds: 30, quiet: false });
 });
 
 test("a conversation streams an answer and Kumo's face follows", () => {

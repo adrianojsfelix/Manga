@@ -1,0 +1,16 @@
+/* The picture-in-picture window: Windows draws the picture above the bar. */
+:root { color-scheme: dark; --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #000; color: #f5f3fa; font: 12px var(--font); overflow: hidden; user-select: none; }
+#pip-view { position: fixed; inset: 0 0 40px 0; display: grid; place-items: center; color: #77728a; }
+#pip-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; height: 40px;
+  display: flex; align-items: center; gap: 4px; padding: 0 6px 0 12px;
+  background: #0d0c12; border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.pip-title { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #cfc9dc; }
+.pip-btn { width: 30px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: #cfc9dc; }
+.pip-btn:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.pip-btn.close:hover { background: #c2414f; }
+select.pip-pick { width: 30px; height: 28px; opacity: 0; position: absolute; cursor: pointer; }
+.pip-pick-wrap { position: relative; width: 30px; height: 28px; }

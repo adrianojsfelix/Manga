@@ -7,3 +7,4 @@ pub mod notifications;
 pub mod sse;
 pub mod hooks;
 pub mod http;
+pub mod media;

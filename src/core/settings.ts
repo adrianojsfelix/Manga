@@ -20,6 +20,8 @@ export interface Settings {
     ignored: string[];
     /** Seconds a notification stays on the island. */
     seconds: number;
+    /** Do not disturb: they go to the list, without a banner. */
+    quiet: boolean;
   };
   claudeCode: {
     /** Permissions and questions come to the island (off: the terminal, as always). */
@@ -37,7 +39,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   provider: "claude",
   ai: { claude: { mode: "key", model: "" }, gemini: { mode: "key", model: "" } },
-  notifications: { on: true, ignored: [], seconds: 6 },
+  notifications: { on: true, ignored: [], seconds: 6, quiet: false },
   claudeCode: { ask: true },
   island: { shape: "notch", rest: "small", scale: 1 },
 };
@@ -66,6 +68,7 @@ export function sanitizeSettings(raw: unknown): Settings {
       on: typeof n.on === "boolean" ? n.on : d.notifications.on,
       ignored: [...new Set(ignored.map((a) => a.trim()))].slice(0, 100),
       seconds,
+      quiet: typeof n.quiet === "boolean" ? n.quiet : d.notifications.quiet,
     },
     claudeCode: { ask: typeof obj(r.claudeCode).ask === "boolean" ? (obj(r.claudeCode).ask as boolean) : d.claudeCode.ask },
     island: {

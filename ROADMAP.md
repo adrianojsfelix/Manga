@@ -29,14 +29,17 @@ Cada fase termina com o app funcionando, testado e checado contra o Windows.
 - ✅ Página de **configurações** (assistente, notificações, ilha). Item: bateria.
 
 ## Fase 3 — Mídia e central de controle
-- **O que está tocando**, de qualquer app: capa ou miniatura do vídeo, título,
-  linha do tempo, anterior / tocar / próxima, o volume do app.
-- **Ondas sonoras** na ilha enquanto toca.
-- **Picture-in-picture**: atalho que pede ao navegador a janela flutuante do
-  vídeo (a extensão do Chrome) e uma janela flutuante própria para links do YouTube.
-- **Central de controle**: volume e saída de áudio, volume de cada app,
-  brilho (tela do notebook e monitores com DDC/CI), Wi-Fi, Bluetooth, Não
-  incomodar, microfone, modo avião, e atalhos (luz noturna, projetar, energia).
+- ✅ **O que está tocando**, de qualquer app: capa ou miniatura do vídeo, título,
+  linha do tempo (clique para pular), anterior / tocar / próxima; a cor da capa
+  tinge a ilha aberta.
+- ✅ **Ondas sonoras** na ilha enquanto toca, no ritmo do som de verdade.
+- ✅ **Picture-in-picture** de qualquer app: uma janela sempre por cima com a
+  imagem ao vivo da janela onde o vídeo toca (a miniatura do próprio Windows),
+  com os botões e a escolha de outra janela.
+- ✅ **Central de controle**: volume e mudo, volume de cada app, brilho (tela do
+  notebook), Wi-Fi, Bluetooth, Não perturbe (da ilha), microfone.
+- Depois: saída de áudio, monitores externos (DDC/CI), modo avião, atalhos
+  (luz noturna, projetar, energia), recortar só o vídeo no picture-in-picture.
 
 ## Fase 4 — Foco, timer e alarmes (seção especial)
 - **Pomodoro** com tempos e rodadas configuráveis, **timer**, **cronômetro** e

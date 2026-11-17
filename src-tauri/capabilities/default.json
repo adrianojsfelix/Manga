@@ -1,7 +1,14 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "What the island's page may do.",
-  "windows": ["island"],
-  "permissions": ["core:default"]
+  "description": "What Manga's pages (the island, the picture-in-picture) may do.",
+  "windows": [
+    "island",
+    "pip"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-close"
+  ]
 }
