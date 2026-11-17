@@ -8,7 +8,7 @@
 
 import type { IslandSize } from "./geometry.ts";
 
-export type Page = "assistant" | "today" | "media" | "focus" | "controls" | "notes" | "settings";
+export type Page = "home" | "assistant" | "media" | "focus" | "controls" | "notes" | "settings";
 
 export interface IslandState {
   size: IslandSize;
@@ -29,7 +29,7 @@ export type IslandEvent =
   | { type: "hold"; on: boolean }
   | { type: "rest"; size: "small" | "medium" };
 
-export const INITIAL: IslandState = { size: "small", rest: "small", page: "assistant", held: false, pointerInside: false };
+export const INITIAL: IslandState = { size: "small", rest: "small", page: "home", held: false, pointerInside: false };
 
 export function next(s: IslandState, e: IslandEvent): IslandState {
   switch (e.type) {

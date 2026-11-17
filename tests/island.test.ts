@@ -1,29 +1,34 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { MARGIN, borderRadius, islandBox, windowPosition, windowSize } from "../src/core/geometry.ts";
+import { MARGIN, borderRadius, earSize, islandBox, windowPosition, windowSize } from "../src/core/geometry.ts";
 import { INITIAL, next } from "../src/core/island-state.ts";
 
 test("each size has its box; a floating island sits below the top, a notch on it", () => {
   const small = islandBox("small", "floating");
-  assert.deepEqual(small, { width: 210, height: 34, radius: 17, gap: 8 });
-  assert.equal(islandBox("small", "notch").gap, 0);
-  assert.equal(borderRadius(small, "floating"), "17px");
-  assert.equal(borderRadius(islandBox("medium", "notch"), "notch"), "0 0 20px 20px");
+  assert.deepEqual(small, { width: 200, height: 32, radius: 16, gap: 8 });
+  const notch = islandBox("small", "notch");
+  assert.equal(notch.gap, 0);
+  assert.equal(notch.radius, 13, "a notch's corners are tighter than a pill's");
+  assert.equal(earSize(notch, "notch"), 8);
+  assert.equal(earSize(small, "floating"), 0, "a floating pill has no ears");
+  assert.equal(borderRadius(small, "floating"), "16px");
+  assert.equal(borderRadius(islandBox("medium", "notch"), "notch"), "0 0 15px 15px");
   const big = islandBox("extended", "floating", 1, 360);
+  assert.equal(islandBox("extended", "notch").height, 320);
   assert.equal(big.height, 360);
   assert.equal(big.radius, 26);
 });
 
 test("the scale is the user's size, kept within reason", () => {
-  assert.equal(islandBox("small", "floating", 1.2).width, 252);
-  assert.equal(islandBox("small", "floating", 5).width, Math.round(210 * 1.4));
-  assert.equal(islandBox("small", "floating", 0).width, Math.round(210 * 0.8));
+  assert.equal(islandBox("small", "floating", 1.2).width, 240);
+  assert.equal(islandBox("small", "floating", 5).width, Math.round(200 * 1.4));
+  assert.equal(islandBox("small", "floating", 0).width, Math.round(200 * 0.8));
 });
 
 test("the window holds the island and its shadow, centred at the top of its monitor", () => {
   const box = islandBox("medium", "floating");
   const win = windowSize(box);
-  assert.deepEqual(win, { width: 420 + MARGIN * 2, height: 8 + 40 + MARGIN });
+  assert.deepEqual(win, { width: 460 + MARGIN * 2, height: 8 + 36 + MARGIN });
   assert.deepEqual(windowPosition({ x: 1920, y: 0, width: 2560 }, win), { x: 1920 + (2560 - win.width) / 2, y: 0 });
 });
 

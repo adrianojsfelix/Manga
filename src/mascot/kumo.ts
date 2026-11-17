@@ -74,6 +74,16 @@ export class Kumo {
     return this.mood;
   }
 
+  /** Mid-blink now (the glowing eyes close too). */
+  get blinking(): boolean {
+    const t = now();
+    if (t > this.nextBlink) {
+      this.blinkUntil = t + 0.12;
+      this.nextBlink = t + 2.5 + Math.random() * 3;
+    }
+    return t < this.blinkUntil;
+  }
+
   /** True while something moves by itself (he is always alive a little). */
   get animating(): boolean {
     return true;
@@ -113,6 +123,75 @@ export class Kumo {
     for (const m of f.marks) drawMark(x, R, m, t, age);
     x.restore();
   }
+}
+
+/**
+ * Kumo as the notch shows him: only his eyes, glowing, in a `w`×`h` area.
+ * They blink, follow the pointer and change with his mood (^ ^ happy, hearts,
+ * wide open, sleepy lines, cross). `eye` is one eye's height.
+ */
+export function drawGlowEyes(x: CanvasRenderingContext2D, kumo: Kumo, w: number, h: number, eye: number, color = "#ffe6c4") {
+  const t = performance.now() / 1000;
+  const mood = kumo.current;
+  const f = faceOf(mood);
+  const blink = kumo.blinking;
+  const ew = eye * 0.62;
+  const gap = eye * 0.95;
+  const cx = w / 2 + kumo.lookX * eye * 0.25;
+  const cy = h / 2 + kumo.lookY * eye * 0.15;
+  x.save();
+  x.shadowColor = color;
+  x.shadowBlur = eye * 0.9;
+  x.fillStyle = color;
+  x.strokeStyle = color;
+  x.lineCap = "round";
+  x.lineWidth = Math.max(1.5, eye * 0.22);
+  for (const s of [-1, 1]) {
+    const ex = cx + s * gap / 2;
+    x.save();
+    x.translate(ex, cy);
+    if (f.eyes === "smile" || (f.eyes === "star")) {
+      x.beginPath();
+      x.arc(0, eye * 0.2, ew * 0.7, Math.PI * 1.15, Math.PI * 1.85);
+      x.stroke();
+    } else if (f.eyes === "closed" || blink) {
+      x.beginPath();
+      x.moveTo(-ew * 0.55, 0);
+      x.lineTo(ew * 0.55, 0);
+      x.stroke();
+    } else if (f.eyes === "heart") {
+      const r = ew * 0.55;
+      x.fillStyle = "#ff7a9c";
+      x.shadowColor = "#ff7a9c";
+      x.beginPath();
+      x.moveTo(0, r);
+      x.bezierCurveTo(-r * 1.6, 0, -r * 0.7, -r * 1.3, 0, -r * 0.35);
+      x.bezierCurveTo(r * 0.7, -r * 1.3, r * 1.6, 0, 0, r);
+      x.fill();
+    } else if (f.eyes === "wide") {
+      x.beginPath();
+      x.arc(0, 0, ew * 0.62, 0, Math.PI * 2);
+      x.fill();
+    } else if (f.eyes === "spiral") {
+      x.lineWidth = Math.max(1, eye * 0.12);
+      x.beginPath();
+      for (let a = 0; a < Math.PI * 4; a += 0.3) {
+        const r = a * ew * 0.06;
+        x.lineTo(Math.cos(a + t * 8 * s) * r, Math.sin(a + t * 8 * s) * r);
+      }
+      x.stroke();
+    } else {
+      // A tall rounded pill; cross: tilted in, sad: tilted out.
+      if (f.eyes === "angry") x.rotate(s * 0.35);
+      if (f.eyes === "sad") x.rotate(-s * 0.25);
+      const hh = f.eyes === "angry" ? eye * 0.7 : eye;
+      x.beginPath();
+      x.roundRect(-ew / 2, -hh / 2, ew, hh, ew / 2);
+      x.fill();
+    }
+    x.restore();
+  }
+  x.restore();
 }
 
 function now(): number {

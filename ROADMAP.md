@@ -8,11 +8,15 @@ dele é GPL e roda dentro do Explorer; o Manga é um app à parte, escrito do ze
 Cada fase termina com o app funcionando, testado e checado contra o Windows.
 
 ## Fase 1 — A base ✅
-- Ilha em três tamanhos: **pequena** (Kumo + relógio), **média** (a barra com
-  os itens) e **estendida** (as páginas).
-- Dois formatos: **pílula flutuante** (Dynamic Island do iPhone) ou **notch**
-  colado no topo (MacBook). Escala de tamanho 80%–140%.
-- O Kumo: bolinha com olhos de anime e a ahoge, 13 humores com as marcas de mangá.
+- Visual de **notch do MacBook** por padrão: colado no topo, cantos de baixo
+  arredondados e as "orelhas" curvando para a borda da tela (ou, se preferir,
+  a **pílula flutuante** da Dynamic Island do iPhone). Escala 80%–140%.
+- Três tamanhos: **pequena** (só os olhos brilhantes do Kumo), **média**
+  (cabeçalho: data à esquerda, olhos no meio, hora à direita, e os itens) e
+  **estendida** (cabeçalho, a página e a barra de páginas embaixo; a página
+  Início com os cartões Kumo, Tocando e Foco).
+- O Kumo: bolinha com olhos de anime e a ahoge, 13 humores com as marcas de
+  mangá; no notch, só os olhos, que piscam, seguem o mouse e mudam com o humor.
 - Itens: relógio e data. Ícone na bandeja para sair.
 
 ## Fase 2 — O assistente e os avisos

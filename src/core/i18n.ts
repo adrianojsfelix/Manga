@@ -6,6 +6,14 @@ type Table = Record<string, string>;
 
 const PT: Table = {
   "Assistant": "Assistente",
+  "Home": "Início",
+  "Hi!": "Oi!",
+  "Ask me anything": "Me pergunte algo",
+  "NOW PLAYING": "TOCANDO",
+  "Nothing playing": "Nada tocando",
+  "Phase {n}": "Fase {n}",
+  "FOCUS": "FOCO",
+  "Ready": "Pronto",
   "Today": "Hoje",
   "Media": "Mídia",
   "Focus": "Foco",
