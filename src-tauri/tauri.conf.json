@@ -12,8 +12,8 @@
   "app": {
     "withGlobalTauri": false,
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ipc: http://ipc.localhost; frame-src https://www.youtube-nocookie.com https://www.youtube.com; media-src 'self' blob: data:",
-      "devCsp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ipc: http://ipc.localhost ws://127.0.0.1:5183 http://127.0.0.1:5183; frame-src https://www.youtube-nocookie.com https://www.youtube.com; media-src 'self' blob: data:"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' ipc: http://ipc.localhost; frame-src https://www.youtube-nocookie.com https://www.youtube.com; media-src 'self' blob: data:",
+      "devCsp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' ipc: http://ipc.localhost ws://127.0.0.1:5183 http://127.0.0.1:5183; frame-src https://www.youtube-nocookie.com https://www.youtube.com; media-src 'self' blob: data:"
     },
     "windows": [
       {

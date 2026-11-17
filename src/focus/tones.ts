@@ -18,7 +18,7 @@ export const TONES: ToneDef[] = [
   { id: "digital", name: "Digital", length: 1.4, notes: [0, 0.18, 0.36, 0.8, 0.98, 1.16].map((at) => n(988, at, 0.12, "square", 0.16)) },
   { id: "drops", name: "Drops", length: 1.5, notes: [0, 0.32, 0.5, 0.9].map((at, i) => n(1400 - i * 120, at, 0.22, "sine", 0.4, 0.5)) },
   { id: "chimes", name: "Wind chimes", length: 2.8, notes: [2093, 1568, 2637, 1760, 2349, 1976].map((f, i) => n(f, i * 0.28 + (i % 2) * 0.07, 1.4, "sine", 0.18)) },
-  { id: "kumo", name: "Kumo's chirp", length: 1.2, notes: [n(880, 0, 0.14, "sine", 0.35, 1.5), n(1175, 0.18, 0.14, "sine", 0.35, 1.5), n(1568, 0.42, 0.3, "triangle", 0.3, 1.2)] },
+  { id: "kumo", name: "Manga's chirp", length: 1.2, notes: [n(880, 0, 0.14, "sine", 0.35, 1.5), n(1175, 0.18, 0.14, "sine", 0.35, 1.5), n(1568, 0.42, 0.3, "triangle", 0.3, 1.2)] },
 ];
 
 export function tone(id: string): ToneDef {

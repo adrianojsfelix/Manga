@@ -198,6 +198,11 @@ fn shot(path: &Path) -> Shot {
     Shot { path: path.display().to_string(), name, image }
 }
 
+/// Opens something known (a Windows page, an app, a web page) with the shell.
+pub fn open_known(target: &str) -> bool {
+    imp::open(target, false)
+}
+
 #[cfg(not(windows))]
 mod imp {
     use std::path::PathBuf;
@@ -301,4 +306,27 @@ mod imp {
             Some(manga_core::media::data_url("image/png", &encode_rgba(N as u32, N as u32, &rgba)))
         }
     }
+}
+
+/// A web page's text (https only, at most 3 MB): the utilities' quotes,
+/// news and Pinterest boards. Nothing is sent but the address.
+#[tauri::command]
+pub async fn fetch_text(url: String) -> Result<String, String> {
+    if !url.starts_with("https://") {
+        return Err("Só endereços https.".into());
+    }
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(12))
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Manga")
+        .build()
+        .map_err(|e| e.to_string())?;
+    let resp = client.get(&url).send().await.map_err(|e| format!("Sem conexão: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("O site respondeu {}.", resp.status().as_u16()));
+    }
+    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+    if bytes.len() > 3 * 1024 * 1024 {
+        return Err("Resposta grande demais.".into());
+    }
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
 }

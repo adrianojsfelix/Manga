@@ -1,8 +1,10 @@
 // The island on screen, shaped like a MacBook's notch by default: glued to
 // the top, its two ears curving into the screen's edge.
-// - small: only Kumo's glowing eyes;
-// - medium: a header — the date on the left, the eyes in the middle, the
+// - small: the time (or Manga's eyes) with an item each side, which give way
+//   to what is going on (a song, a download, a countdown);
+// - medium: a header — the date on the left, Manga's eyes in the middle, the
 //   time on the right — with the items of the bar;
+// - bar and wide: the header wider, with the tools' icons;
 // - extended: the same header, a page, and the dock of pages at the bottom.
 // A Windows notification drops in as a banner below the header for a few
 // seconds. It follows the state machine (core/island-state.ts) and sizes its
@@ -32,6 +34,8 @@ import { clock as focusClock, shown as focusShown } from "../focus/timer.ts";
 import { playTone } from "../focus/tones.ts";
 import { I } from "./icons.ts";
 import { SettingsView } from "../settings/settings-view.ts";
+import { SystemView } from "../sysinfo/system-view.ts";
+import { ToolsView } from "../tools/tools-view.ts";
 import { Canvas, el, icon } from "./dom.ts";
 
 export interface Look {
@@ -51,6 +55,9 @@ const ICON: Record<Page, string> = {
   controls: "M4 7h9M17 7h3M4 17h3M11 17h9M15 5v4M9 15v4",
   notes: "M6 3.5h9l3.5 3.5v13.5H6zM9 10h6M9 13.5h6M9 17h4",
   inbox: "M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0",
+  system: "M4 5h16v11H4zM9 20h6M12 16v4M7 12l2.5-3 2.5 2 3-4 2 2",
+  tools: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM16.5 13v7M13 16.5h7",
+  today: "M4.5 6h15v14h-15zM4.5 10h15M8.5 3.5v4M15.5 3.5v4M8 13.5h2M14 13.5h2M8 17h2",
   settings:
     "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 13.5l1.6 1.2-2 3.4-1.9-.7a7 7 0 0 1-2 1.2L14.8 21h-4l-.3-2.4a7 7 0 0 1-2-1.2l-1.9.7-2-3.4 1.6-1.2a7 7 0 0 1 0-2.4L4.6 9.9l2-3.4 1.9.7a7 7 0 0 1 2-1.2l.3-2.4h4l.3 2.4a7 7 0 0 1 2 1.2l1.9-.7 2 3.4-1.6 1.2a7 7 0 0 1 0 2.4z",
 };
@@ -61,6 +68,9 @@ const PAGES: { id: Page; label: string; phase: number }[] = [
   { id: "media", label: "Media", phase: 3 },
   { id: "focus", label: "Focus", phase: 4 },
   { id: "controls", label: "Controls", phase: 3 },
+  { id: "system", label: "System", phase: 4 },
+  { id: "tools", label: "Utilities", phase: 4 },
+  { id: "today", label: "Today", phase: 5 },
   { id: "notes", label: "Notes", phase: 5 },
   { id: "settings", label: "Settings", phase: 2 },
   { id: "inbox", label: "Notifications", phase: 2 },
@@ -108,6 +118,18 @@ export class Island {
   private capsSmall = el("span", "caps-small", "A");
   private ring = el("span", "dl-ring");
   private smallFace = el("div", "small-face");
+  private slotL = el("span", "slot slot-l");
+  private slotR = el("span", "slot slot-r");
+  private smallCenter = el("span", "small-center");
+  private headTools = el("span", "head-tools");
+  private homeFace = new Canvas(96, 96, "home-manga", (x) => this.kumo.draw(x, 96, 96, 60));
+  private sys: ItemContext["sys"] = null;
+  private liveOn = false;
+  private systemView = new SystemView((s) => {
+    this.sys = s;
+  });
+  private toolsView: ToolsView;
+  private liveRect = "";
   readonly focus: FocusEngine;
   private focusView: FocusView;
   private countdown = el("span", "countdown");
@@ -145,6 +167,7 @@ export class Island {
     items: ItemPrefs,
     private settings: Settings,
     private save: (s: Settings) => void,
+    private saveItems: (i: ItemPrefs) => void = () => {},
   ) {
     this.items = items;
     this.shell.id = "island";
@@ -159,8 +182,17 @@ export class Island {
       () => this.settings.notifications.quiet,
       (quiet) => this.change({ notifications: { ...this.settings.notifications, quiet } }),
       hold("controls"),
+      () => this.settings.controls,
+      (controls) => this.change({ controls }),
     );
-    this.settingsView = new SettingsView(() => this.settings, change, () => this.recent, () => this.sessions, hold("settings"));
+    this.settingsView = new SettingsView(() => this.settings, change, () => this.recent, () => this.sessions, hold("settings"), {
+      get: () => this.items,
+      set: (i) => {
+        this.items = i;
+        this.saveItems(i);
+        this.render();
+      },
+    });
     this.focus = new FocusEngine(
       () => this.settings.focus,
       (r) => this.ringAlarm(r),
@@ -189,6 +221,16 @@ export class Island {
       this.restShown = 0;
       this.focus.skip();
     });
+    this.toolsView = new ToolsView(
+      () => this.settings.tools,
+      (tools) => this.change({ tools }),
+      hold("tools"),
+    );
+    // The bar's CPU, memory and network items read the PC every few seconds.
+    window.setInterval(() => {
+      const wants = this.items.medium.concat(this.items.small).some((i) => i === "cpu" || i === "ram" || i === "net");
+      if (wants && this.shownPage !== "system" && this.state.size !== "small") void this.systemView.read().then(() => this.renderHead());
+    }, 3000);
     this.banner = new Banner(
       this.kumo,
       () => this.settings.notifications.seconds,
@@ -216,38 +258,29 @@ export class Island {
       this.dispatch({ type: "open", page: "inbox" });
     });
 
-    const small = this.smallFace;
-    small.append(this.miniCover, this.capsSmall, this.eyesBig.el, this.countBadge, this.wavesSmall.el, this.countdown, this.ring);
+    const middle = el("span", "small-mid");
+    middle.append(this.smallCenter, this.countBadge);
+    this.smallFace.append(this.slotL, middle, this.slotR);
 
     const head = el("div", "head");
     const center = el("span", "head-center");
     center.append(this.eyesSmall.el);
     const right = el("span", "head-right-box");
     right.append(this.headItems, this.headRight, this.menu);
-    head.append(this.headLeft, center, right);
+    const left = el("span", "head-left-box");
+    left.append(this.headLeft, this.headTools);
+    head.append(left, center, right);
     this.menu.title = t("Pin the island open");
     this.menu.addEventListener("click", (e) => {
       e.stopPropagation();
       this.hold("pin", !this.holds.has("pin"));
     });
 
-    for (const p of PAGES.filter((x) => x.id !== "inbox")) {
-      const b = el("button", "dock-btn");
-      b.dataset.page = p.id;
-      b.title = t(p.label);
-      b.append(icon(ICON[p.id], 17));
-      b.addEventListener("click", (e) => {
-        e.stopPropagation();
-        this.dispatch({ type: "open", page: p.id });
-      });
-      if (p.id === "settings") b.classList.add("end");
-      this.dock.append(b);
-    }
-    this.dock.insertBefore(this.dockLabel, this.dock.querySelector(".end"));
+    this.renderDock();
 
     const body = el("div", "body");
     body.append(this.page, this.dock);
-    this.clip.append(small, head, this.banner.el, body, this.hud.el, this.ask.el);
+    this.clip.append(this.smallFace, head, this.banner.el, body, this.hud.el, this.ask.el);
     this.shell.append(this.earL, this.earR, this.clip);
     root.append(this.shell);
 
@@ -286,6 +319,57 @@ export class Island {
 
     this.render();
     this.loop();
+  }
+
+  /** The dock and the bars' tools: the pages the user picked, settings last. */
+  private renderDock() {
+    const button = (id: Page, size: number, cls: string) => {
+      const p = PAGES.find((x) => x.id === id)!;
+      const b = el("button", cls);
+      b.dataset.page = id;
+      b.title = t(p.label);
+      b.append(icon(ICON[id], size));
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.dispatch({ type: "open", page: id });
+      });
+      return b;
+    };
+    const pages = this.settings.island.dock;
+    this.dock.replaceChildren(...pages.map((id) => button(id, 17, "dock-btn")), this.dockLabel);
+    const gear = button("settings", 17, "dock-btn end");
+    this.dock.append(gear);
+    this.headTools.replaceChildren(...pages.map((id) => button(id, 15, "tool-btn")), button("settings", 15, "tool-btn"));
+  }
+
+  /** The small island: its middle, and what each side shows now. */
+  private renderSmall() {
+    const s = this.settings.island;
+    const now = new Date();
+    const time = now.toLocaleTimeString(language(), { hour: "2-digit", minute: "2-digit" });
+    if (s.center === "eyes") {
+      if (this.smallCenter.firstChild !== this.eyesBig.el) this.smallCenter.replaceChildren(this.eyesBig.el);
+    } else {
+      const day = now.toLocaleDateString(language(), { weekday: "short", day: "numeric" }).replace(/\./g, "").toUpperCase();
+      this.smallCenter.textContent = s.center === "datetime" ? `${day}  ${time}` : time;
+    }
+    this.smallCenter.className = `small-center c-${s.center}`;
+    if (this.state.size !== "small") return;
+    const ctx: ItemContext = { battery: this.battery, unread: this.unread, sys: this.sys };
+    const item = (i: number): Node | null => {
+      const id = this.items.small[i];
+      if (!id || id === "notifications") return null;
+      if (id === "countdown") return this.focus.state.running ? this.countdown : null;
+      if (id === "waves") return this.media?.playing ? this.wavesSmall.el : null;
+      const v = itemView(id, now, ctx);
+      return v ? el("span", `slot-item item-${id}`, v.text) : null;
+    };
+    const left = this.media?.playing && this.media.cover ? this.miniCover : this.locks.caps ? this.capsSmall : item(0);
+    const right = this.shownDownload() ? this.ring : this.focus.state.running ? this.countdown : this.media?.playing ? this.wavesSmall.el : item(1);
+    this.slotL.replaceChildren(...(left ? [left] : []));
+    this.slotR.replaceChildren(...(right ? [right] : []));
+    // The count by the time only when the user wants notifications there.
+    this.countBadge.hidden = !this.items.small.includes("notifications");
   }
 
   dispatch(e: IslandEvent) {
@@ -553,6 +637,7 @@ export class Island {
     if (p.focus) this.focus.prefsChanged();
     if (p.island) {
       if (p.island.rest !== before.island.rest) this.dispatch({ type: "rest", size: p.island.rest });
+      if (p.island.dock !== before.island.dock) this.renderDock();
       this.render();
     }
   }
@@ -578,7 +663,7 @@ export class Island {
   private box(): Box {
     const s = this.state;
     const i = this.settings.island;
-    const box = islandBox(s.size, i.shape, i.scale);
+    const box = islandBox(s.size, i.shape, i.scale, undefined, window.screen?.width);
     if (this.ask.current) {
       // As wide as it needs, as tall as what it asks.
       const k = Math.min(1.4, Math.max(0.8, i.scale));
@@ -656,6 +741,7 @@ export class Island {
     const open = s.size === "extended" ? s.page : null;
     if (open !== this.shownPage) {
       if (this.shownPage === "controls") this.controlsView.close();
+      if (this.shownPage === "system") this.systemView.close();
       this.shownPage = open;
       this.renderPage(page);
     }
@@ -669,13 +755,13 @@ export class Island {
     this.headRight.textContent = now.toLocaleTimeString(language(), { hour: "2-digit", minute: "2-digit" });
     // The medium island's other items (not the clock and date, already there).
     this.headItems.replaceChildren();
-    if (this.state.size === "small") this.smallFace.append(this.countdown, this.ring);
+    this.renderSmall();
     if (this.state.size !== "small") {
       if (this.locks.caps) this.headItems.append(el("span", "head-item item-caps", "CAPS"));
       if (this.shownDownload()) this.headItems.append(this.ring);
       const busy = this.sessions.filter((x) => x.state === "working");
       if (busy.length) this.headItems.append(el("span", "head-item item-cc", busy.length > 1 ? t("{n} sessions", { n: busy.length }) : busy[0].project));
-      const ctx: ItemContext = { battery: this.battery, unread: this.unread };
+      const ctx: ItemContext = { battery: this.battery, unread: this.unread, sys: this.sys };
       for (const id of this.items.medium) {
         if (id === "clock" || id === "date") continue;
         if (id === "notifications") {
@@ -725,7 +811,7 @@ export class Island {
               `c-kumo c-cc ${this.sessions[0].state}`,
               "settings",
             )
-          : card("KUMO", t("Hi!"), t("Ask me anything"), "c-kumo", "assistant"),
+          : this.mangaCard(card),
         this.mediaCard(card),
         last
           ? card(t("NOTIFICATIONS"), last.title || last.app, last.app, "c-focus c-notice", "inbox")
@@ -761,6 +847,16 @@ export class Island {
       void this.controlsView.open();
       return;
     }
+    if (page.id === "system") {
+      this.page.append(this.systemView.el);
+      this.systemView.open();
+      return;
+    }
+    if (page.id === "tools") {
+      this.page.append(this.toolsView.el);
+      this.toolsView.open();
+      return;
+    }
     if (page.id === "settings") {
       this.settingsView.paint();
       this.page.append(this.settingsView.el);
@@ -771,6 +867,13 @@ export class Island {
     text.append(el("h2", "", t(page.label)), el("p", "", t("This page arrives in phase {n}.", { n: page.phase })));
     wrap.append(text);
     this.page.append(wrap);
+  }
+
+  /** Manga on the home page: himself, saying hi. */
+  private mangaCard(card: (label: string, big: string, small: string, cls: string, go?: Page) => HTMLElement) {
+    const c = card("MANGA", t("Hi!"), t("Ask me anything"), "c-kumo c-manga", "assistant");
+    c.prepend(this.homeFace.el);
+    return c;
   }
 
   private focusCard(card: (label: string, big: string, small: string, cls: string, go?: Page) => HTMLElement) {
@@ -788,12 +891,34 @@ export class Island {
     return c;
   }
 
+  /** The video, live, in the media page's cover (Windows draws it there). */
+  private live() {
+    const want = this.mediaView.liveWanted && this.state.size === "extended" && this.state.page === "media" && !this.ask.current && this.hud.current?.kind !== "ring";
+    if (!want) {
+      if (this.liveOn) {
+        this.liveOn = false;
+        this.liveRect = "";
+        void Bridge.mediaLiveOff();
+      }
+      return;
+    }
+    const r = this.mediaView.coverRect();
+    if (!r || r.width < 20) return;
+    const key = `${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.width)},${Math.round(r.height)}`;
+    if (key === this.liveRect) return;
+    this.liveRect = key;
+    this.liveOn = true;
+    void Bridge.mediaLive(r.left, r.top, r.width, r.height).then((res) => {
+      if (res && "error" in res) this.mediaView.liveFailed(res.error);
+    });
+  }
+
   private lastMinute = -1;
   private loop() {
     const frame = () => {
       this.banner.frame();
       if (this.state.size === "small" && !this.banner.current) {
-        this.eyesBig.draw();
+        if (this.settings.island.center === "eyes") this.eyesBig.draw();
         if (this.media?.playing) this.wavesSmall.draw();
       } else {
         this.eyesSmall.draw();
@@ -810,6 +935,8 @@ export class Island {
         if (live && live.textContent !== txt) live.textContent = txt;
       }
       if (this.state.size === "extended" && this.state.page === "assistant") this.chat.frame();
+      if (this.state.size === "extended" && this.state.page === "home" && this.homeFace.el.isConnected) this.homeFace.draw();
+      this.live();
       const m = new Date().getMinutes();
       if (m !== this.lastMinute) {
         this.lastMinute = m;

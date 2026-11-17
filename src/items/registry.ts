@@ -7,7 +7,7 @@ import { language } from "../core/i18n.ts";
 
 export type ItemId =
   | "clock" | "date" | "weather" | "battery" | "waves" | "countdown" | "water"
-  | "recycle" | "keyboard" | "taskbar" | "event" | "notifications";
+  | "recycle" | "keyboard" | "taskbar" | "event" | "notifications" | "cpu" | "ram" | "net";
 
 export interface ItemDef {
   id: ItemId;
@@ -27,6 +27,9 @@ export const ITEMS: readonly ItemDef[] = [
   { id: "battery", name: "Battery", phase: 2 },
   { id: "water", name: "Water", phase: 5 },
   { id: "event", name: "Next event", phase: 5 },
+  { id: "cpu", name: "CPU", phase: 4 },
+  { id: "ram", name: "Memory", phase: 4 },
+  { id: "net", name: "Network", phase: 4 },
   { id: "recycle", name: "Recycle Bin", phase: 6 },
   { id: "keyboard", name: "Keyboard language", phase: 6 },
   { id: "taskbar", name: "Taskbar apps", phase: 6 },
@@ -42,7 +45,7 @@ export interface ItemPrefs {
   medium: ItemId[];
 }
 
-export const DEFAULT_ITEMS: ItemPrefs = { small: ["clock"], medium: ["date", "clock", "countdown", "waves", "notifications", "battery"] };
+export const DEFAULT_ITEMS: ItemPrefs = { small: ["notifications", "battery"], medium: ["date", "clock", "countdown", "waves", "notifications", "battery"] };
 
 const IDS = new Set(ITEMS.map((i) => i.id));
 
@@ -54,7 +57,7 @@ export function sanitizeItems(raw: unknown): ItemPrefs {
     for (const id of list) if (IDS.has(id) && !out.includes(id)) out.push(id);
     return out.slice(0, max);
   };
-  return { small: clean(r.small, 2, DEFAULT_ITEMS.small), medium: clean(r.medium, 8, DEFAULT_ITEMS.medium) };
+  return { small: clean(r.small, 2, DEFAULT_ITEMS.small), medium: clean(r.medium, 10, DEFAULT_ITEMS.medium) };
 }
 
 export interface ItemView {
@@ -67,6 +70,13 @@ export interface ItemContext {
   battery?: { level: number; charging: boolean } | null;
   /** Notifications that arrived since the list was last looked at. */
   unread?: number;
+  /** The PC's numbers, when read. */
+  sys?: { cpu: number; ramUsed: number; ramTotal: number; down: number; up: number } | null;
+}
+
+function rate(b: number): string {
+  if (b >= 1024 * 1024) return `${(b / 1024 / 1024).toFixed(1).replace(".", ",")} MB/s`;
+  return `${Math.round(b / 1024)} KB/s`;
 }
 
 /** What an item shows now, or null when it has nothing (or is not built yet). */
@@ -81,6 +91,12 @@ export function itemView(id: ItemId, now: Date, ctx: ItemContext = {}): ItemView
       if (!b) return null;
       return { text: `${b.charging ? "⚡" : ""}${Math.round(b.level * 100)}%` };
     }
+    case "cpu":
+      return ctx.sys ? { text: `CPU ${Math.round(ctx.sys.cpu)}%` } : null;
+    case "ram":
+      return ctx.sys && ctx.sys.ramTotal ? { text: `RAM ${Math.round((ctx.sys.ramUsed / ctx.sys.ramTotal) * 100)}%` } : null;
+    case "net":
+      return ctx.sys ? { text: `↓ ${rate(ctx.sys.down)}` } : null;
     case "notifications":
       return ctx.unread ? { text: `● ${ctx.unread}` } : null;
     default:

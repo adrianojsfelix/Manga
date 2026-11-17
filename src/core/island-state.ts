@@ -8,17 +8,19 @@
 
 import type { IslandSize } from "./geometry.ts";
 
-export type Page = "home" | "assistant" | "media" | "focus" | "controls" | "notes" | "settings" | "inbox";
+export type Page = "home" | "assistant" | "media" | "focus" | "controls" | "notes" | "settings" | "inbox" | "system" | "tools" | "today";
 
 export interface IslandState {
   size: IslandSize;
   /** The size it rests at, from the settings. */
-  rest: "small" | "medium";
+  rest: Rest;
   page: Page;
   /** Kept open: the pin, typing, a card that needs an answer. */
   held: boolean;
   pointerInside: boolean;
 }
+
+export type Rest = "small" | "medium" | "bar" | "wide";
 
 export type IslandEvent =
   | { type: "enter" }
@@ -27,7 +29,7 @@ export type IslandEvent =
   | { type: "open"; page: Page }
   | { type: "fold" }
   | { type: "hold"; on: boolean }
-  | { type: "rest"; size: "small" | "medium" };
+  | { type: "rest"; size: Rest };
 
 export const INITIAL: IslandState = { size: "small", rest: "small", page: "home", held: false, pointerInside: false };
 

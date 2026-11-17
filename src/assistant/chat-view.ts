@@ -37,7 +37,7 @@ export class ChatView {
     const main = el("div", "chat-main");
     const row = el("div", "chat-row");
     this.input.rows = 1;
-    this.input.placeholder = t("Ask Kumo…");
+    this.input.placeholder = t("Ask Manga…");
     this.input.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
@@ -149,7 +149,7 @@ export class ChatView {
     this.list.replaceChildren();
     if (!this.c.turns.length) {
       const hello = el("div", "chat-hello");
-      hello.append(el("b", "", t("Hi! I'm {name}.", { name: "Kumo" })), el("span", "", t("Ask me anything. I answer with {ai}.", { ai: NAMES[s.provider] })));
+      hello.append(el("b", "", t("Hi! I'm {name}.", { name: "Manga" })), el("span", "", t("Ask me anything. I answer with {ai}.", { ai: NAMES[s.provider] })));
       this.list.append(hello);
     }
     for (const turn of this.c.turns) {

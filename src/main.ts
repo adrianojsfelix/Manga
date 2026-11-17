@@ -28,6 +28,7 @@ const island = new Island(
   sanitizeItems(saved("manga.items")),
   sanitizeSettings(saved("manga.settings")),
   (s: Settings) => keep("manga.settings", s),
+  (i) => keep("manga.items", i),
 );
 // The dev page drives it from the console: island.notify({...}).
 Object.assign(window, { island });

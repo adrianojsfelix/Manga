@@ -3,13 +3,15 @@
 // Three sizes, as the user picks how much the island shows at rest:
 // - small: a pill with the mascot and one or two items (the clock…);
 // - medium: wider, with the items of the bar (weather, battery, what plays…);
+// - bar: a wider strip, with the tools' icons too;
+// - wide: almost the screen's width;
 // - extended: open, with a page (the assistant, the controls, focus…).
 // Two shapes: "notch" (the default), glued to the top edge like a MacBook's,
 // its bottom corners round and two little "ears" curving into the screen's
 // edge at the top; or "floating", a pill a little below the top of the
 // screen, every corner round (the iPhone's Dynamic Island).
 
-export type IslandSize = "small" | "medium" | "extended";
+export type IslandSize = "small" | "medium" | "bar" | "wide" | "extended";
 export type IslandShape = "floating" | "notch";
 
 export interface Box {
@@ -32,15 +34,18 @@ export function earSize(box: Box, shape: IslandShape): number {
 const SIZES: Record<IslandSize, { width: number; height: number }> = {
   small: { width: 200, height: 32 },
   medium: { width: 460, height: 36 },
+  bar: { width: 780, height: 36 },
+  wide: { width: 1200, height: 36 },
   extended: { width: 700, height: 320 },
 };
 
 /** The island's box for a size, a shape and a scale (0.8–1.4, the user's "size"). */
-export function islandBox(size: IslandSize, shape: IslandShape, scale = 1, extendedHeight?: number): Box {
+export function islandBox(size: IslandSize, shape: IslandShape, scale = 1, extendedHeight?: number, screenWidth?: number): Box {
   const k = Math.min(1.4, Math.max(0.8, scale));
   const base = SIZES[size];
   const height = Math.round((size === "extended" && extendedHeight ? extendedHeight : base.height) * k);
-  const width = Math.round(base.width * k);
+  // The wide bar: the screen's width less a margin each side (never under the bar).
+  const width = size === "wide" && screenWidth ? Math.max(Math.round(SIZES.bar.width * k), Math.round(screenWidth - 160)) : Math.round(base.width * k);
   // A notch's corners are tighter than a pill's, as on a MacBook.
   const radius = size === "extended" ? Math.round(26 * k) : shape === "notch" ? Math.round(height * 0.42) : Math.round(height / 2);
   return { width, height, radius, gap: shape === "floating" ? Math.round(8 * k) : 0 };

@@ -54,3 +54,18 @@ test("something held keeps it open; resting at medium folds to medium", () => {
   assert.equal(next(s, { type: "fold" }).size, "medium");
   assert.equal(s.page, "focus");
 });
+
+test("the bars rest wide, peek nowhere, and open on a click", async () => {
+  const { next, INITIAL } = await import("../src/core/island-state.ts");
+  const { islandBox } = await import("../src/core/geometry.ts");
+  let s = next(INITIAL, { type: "rest", size: "bar" });
+  assert.equal(s.size, "bar");
+  s = next(s, { type: "enter" });
+  assert.equal(s.size, "bar");
+  s = next(s, { type: "click" });
+  assert.equal(s.size, "extended");
+  s = next(next(s, { type: "leave" }), { type: "fold" });
+  assert.equal(s.size, "bar");
+  assert.equal(islandBox("wide", "notch", 1, undefined, 1920).width, 1760);
+  assert.equal(islandBox("wide", "notch", 1, undefined, 700).width, 780, "never narrower than the bar");
+});

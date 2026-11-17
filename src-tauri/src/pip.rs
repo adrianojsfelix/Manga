@@ -69,6 +69,21 @@ pub fn pip_close(app: AppHandle) {
     }
 }
 
+/// The video, live, inside the island's media page: Windows draws the
+/// window where it plays into that rectangle (CSS pixels of the island's window).
+#[tauri::command]
+pub fn media_live(app: AppHandle, x: f64, y: f64, width: f64, height: f64) -> Result<String, String> {
+    let island = app.get_webview_window("island").ok_or("Sem ilha.")?;
+    let src = imp::windows().into_iter().next().ok_or("Não achei a janela do que está tocando.")?;
+    imp::live(&island, src.id, (x, y, width, height))?;
+    Ok(src.app)
+}
+
+#[tauri::command]
+pub fn media_live_off() {
+    imp::live_off();
+}
+
 #[cfg(not(windows))]
 mod imp {
     pub fn windows() -> Vec<super::Source> {
@@ -79,6 +94,10 @@ mod imp {
     }
     pub fn fit(_: &tauri::WebviewWindow) {}
     pub fn release() {}
+    pub fn live(_: &tauri::WebviewWindow, _: isize, _: (f64, f64, f64, f64)) -> Result<(), String> {
+        Err("Só no Windows.".into())
+    }
+    pub fn live_off() {}
 }
 
 #[cfg(windows)]
@@ -97,6 +116,50 @@ mod imp {
 
     /// The thumbnail being shown (DWM's handle), 0 for none.
     static THUMB: Mutex<isize> = Mutex::new(0);
+    /// The live one in the island: (thumbnail, source window).
+    static LIVE: Mutex<(isize, isize)> = Mutex::new((0, 0));
+
+    pub fn live_off() {
+        let mut l = LIVE.lock().unwrap();
+        if l.0 != 0 {
+            unsafe {
+                let _ = DwmUnregisterThumbnail(l.0);
+            }
+        }
+        *l = (0, 0);
+    }
+
+    pub fn live(w: &tauri::WebviewWindow, source: isize, rect: (f64, f64, f64, f64)) -> Result<(), String> {
+        let dest = hwnd_of(w).ok_or("Sem janela.")?;
+        let mut l = LIVE.lock().unwrap();
+        if l.1 != source || l.0 == 0 {
+            if l.0 != 0 {
+                unsafe {
+                    let _ = DwmUnregisterThumbnail(l.0);
+                }
+            }
+            let id = unsafe { DwmRegisterThumbnail(dest, HWND(source as _)) }.map_err(|e| format!("O Windows não deixou mostrar o vídeo ({e})."))?;
+            *l = (id, source);
+        }
+        let k = w.scale_factor().unwrap_or(1.0);
+        let (x, y, rw, rh) = ((rect.0 * k) as i32, (rect.1 * k) as i32, (rect.2 * k) as i32, (rect.3 * k) as i32);
+        unsafe {
+            let src: SIZE = DwmQueryThumbnailSourceSize(l.0).unwrap_or(SIZE { cx: rw, cy: rh });
+            let f = (rw as f64 / src.cx.max(1) as f64).min(rh as f64 / src.cy.max(1) as f64);
+            let (w2, h2) = ((src.cx as f64 * f) as i32, (src.cy as f64 * f) as i32);
+            let (x2, y2) = (x + (rw - w2) / 2, y + (rh - h2) / 2);
+            let props = DWM_THUMBNAIL_PROPERTIES {
+                dwFlags: DWM_TNP_RECTDESTINATION | DWM_TNP_VISIBLE | DWM_TNP_OPACITY | DWM_TNP_SOURCECLIENTAREAONLY,
+                rcDestination: RECT { left: x2, top: y2, right: x2 + w2, bottom: y2 + h2 },
+                opacity: 255,
+                fVisible: true.into(),
+                fSourceClientAreaOnly: true.into(),
+                ..Default::default()
+            };
+            let _ = DwmUpdateThumbnailProperties(l.0, &props);
+        }
+        Ok(())
+    }
 
     unsafe extern "system" fn each(hwnd: HWND, list: LPARAM) -> BOOL {
         let list = &mut *(list.0 as *mut Vec<(isize, String, u32)>);

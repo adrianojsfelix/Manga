@@ -12,8 +12,8 @@ pub struct Turn {
     pub text: String,
 }
 
-/// Kumo's character, for both AIs.
-pub const SYSTEM: &str = "Você é o Kumo, o assistente do Manga: uma bolinha simpática que mora numa ilha no topo do Windows. \
+/// Manga's character, for both AIs.
+pub const SYSTEM: &str = "Você é o Manga, o assistente que mora numa ilha no topo do Windows: uma bolinha simpática. \
 Responda em português do Brasil (ou na língua da pessoa), de forma curta e direta, como numa conversa: \
 a ilha é pequena, então prefira poucas frases e listas curtas, e use Markdown só quando ajudar.";
 
@@ -108,7 +108,7 @@ pub fn transcript(turns: &[Turn]) -> String {
         if i == last && t.role == "user" {
             out.push_str(&format!("Pergunta: {}\n", t.text));
         } else {
-            let who = if t.role == "assistant" { "Kumo" } else { "Pessoa" };
+            let who = if t.role == "assistant" { "Manga" } else { "Pessoa" };
             out.push_str(&format!("{who}: {}\n", t.text));
         }
     }
@@ -163,6 +163,6 @@ mod tests {
     #[test]
     fn a_command_line_ai_reads_the_conversation_as_one_prompt() {
         let p = transcript(&turns());
-        assert!(p.contains("Pessoa: Oi\nKumo: Olá!\nPergunta: Que horas são em Tóquio?"));
+        assert!(p.contains("Pessoa: Oi\nManga: Olá!\nPergunta: Que horas são em Tóquio?"));
     }
 }

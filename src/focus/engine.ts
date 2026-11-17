@@ -271,7 +271,16 @@ export class FocusEngine {
         this.yt.className = "yt-player";
         this.yt.allow = "autoplay; encrypted-media";
         this.yt.src = embedUrl(ref);
-        this.yt.addEventListener("load", () => this.ytVolume());
+        // The player takes commands once told someone listens; it may still be
+        // loading, so the volume is sent a few times.
+        this.yt.addEventListener("load", () => {
+          let n = 0;
+          const timer = window.setInterval(() => {
+            this.yt?.contentWindow?.postMessage(JSON.stringify({ event: "listening", id: 1, channel: "widget" }), "*");
+            this.ytVolume();
+            if (++n > 10 || !this.yt) window.clearInterval(timer);
+          }, 500);
+        });
         this.host.append(this.yt);
       }
     }
@@ -296,7 +305,9 @@ export class FocusEngine {
   }
 
   private ytVolume(v = this.settings().musicVolume) {
-    this.yt?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "setVolume", args: [Math.round(v * 100)] }), "*");
+    const send = (func: string, args: unknown[] = []) => this.yt?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args, id: 1, channel: "widget" }), "*");
+    send("unMute");
+    send("setVolume", [Math.round(v * 100)]);
   }
 }
 

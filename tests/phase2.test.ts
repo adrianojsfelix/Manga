@@ -18,7 +18,11 @@ test("saved settings keep what is valid and fall back on the rest", () => {
   assert.equal(f.volume, 1);
   assert.deepEqual(f.alert, { place: "top", mood: "proud", message: "", color: "#8b7cf6", repeat: true });
   assert.equal(f.prefs.focus, 50);
-  assert.deepEqual(s.island, { shape: "floating", rest: "small", scale: 1.4 });
+  assert.deepEqual(s.island, { ...DEFAULT_SETTINGS.island, shape: "floating", rest: "small", scale: 1.4 });
+  const j = sanitizeSettings({ island: { rest: "wide", center: "eyes", dock: ["media", "nope", "media", "home"] }, controls: ["wifi", 3, "wifi"], tools: { pins: [" ana/x ", ""] } });
+  assert.deepEqual([j.island.rest, j.island.center, j.island.dock], ["wide", "eyes", ["media", "home"]]);
+  assert.deepEqual(j.controls, ["wifi"]);
+  assert.deepEqual(j.tools.pins, ["ana/x"]);
   assert.equal(s.provider, "gemini");
   assert.deepEqual(s.ai.claude, { mode: "subscription", model: "claude-x" });
   assert.deepEqual(s.ai.gemini, { mode: "key", model: "" });

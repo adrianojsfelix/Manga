@@ -15,7 +15,21 @@ export class MediaView {
   private end = el("span", "m-time");
   private note = el("div", "m-note");
 
+  /** The user wants the video live in the cover. */
+  liveWanted = false;
+  private cover: HTMLElement | null = null;
+
   constructor(private media: () => { m: Media | null; readAt: number }) {}
+
+  coverRect(): DOMRect | null {
+    return this.cover?.isConnected ? this.cover.getBoundingClientRect() : null;
+  }
+
+  liveFailed(why: string) {
+    this.liveWanted = false;
+    this.note.textContent = why;
+    this.paint();
+  }
 
   paint() {
     const { m } = this.media();
@@ -26,8 +40,10 @@ export class MediaView {
       this.el.append(empty);
       return;
     }
-    const cover = el("div", "m-cover");
-    if (m.cover) cover.style.backgroundImage = `url("${m.cover}")`;
+    const cover = el("div", `m-cover${this.liveWanted ? " live" : ""}`);
+    this.cover = cover;
+    if (this.liveWanted) cover.append(el("span", "m-live-tag", t("LIVE")));
+    else if (m.cover) cover.style.backgroundImage = `url("${m.cover}")`;
     else cover.append(icon(I.play, 36));
 
     const info = el("div", "m-info");
@@ -61,6 +77,14 @@ export class MediaView {
       btn(m.playing ? I.pause : I.play, m.playing ? t("Pause") : t("Play"), "main", () => void Bridge.mediaControl("play_pause"), 20),
       btn(I.next, t("Next"), "", () => void Bridge.mediaControl("next")),
       el("span", "m-gap"),
+      btn(I.windows, this.liveWanted ? t("Show the cover") : t("Watch here"), this.liveWanted ? "on" : "", () => {
+        if (!IN_APP) {
+          this.note.textContent = t("The live video shows in the app.");
+          return;
+        }
+        this.liveWanted = !this.liveWanted;
+        this.paint();
+      }),
       btn(I.pip, t("Picture-in-picture"), "", () => void this.pip()),
     );
     info.append(time, row, this.note);

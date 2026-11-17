@@ -55,11 +55,20 @@ export const Bridge = {
   soundLevel: () => call<number>("sound_level"),
   radiosGet: () => call<{ kind: "wifi" | "bluetooth"; on: boolean }[]>("radios_get"),
   radioSet: (kind: "wifi" | "bluetooth", on: boolean) => call<boolean>("radio_set", { kind, on }),
-  brightnessGet: () => call<number | null>("brightness_get"),
-  brightnessSet: (value: number) => call<boolean>("brightness_set", { value }),
+  brightnessSet: (id: string, value: number) => call<boolean>("brightness_set", { id, value }),
   pipWindows: () => call<PipSource[]>("pip_windows"),
   pipOpen: (source?: number) => invokeOrError<PipSource>("pip_open", { source: source ?? null }),
   pipClose: () => call<void>("pip_close"),
+  /** The playing window, live, in a rectangle of the island (CSS px). */
+  mediaLive: (x: number, y: number, width: number, height: number) => invokeOrError<string>("media_live", { x, y, width, height }),
+  mediaLiveOff: () => call<void>("media_live_off"),
+  sysinfo: () => call<SysInfoRaw>("sysinfo"),
+  brightnessList: () => call<{ id: string; name: string; value: number }[]>("brightness_list"),
+  winState: () => call<WinState>("win_state"),
+  winAction: (action: string) => call<boolean>("win_action", { action }),
+  openUrl: (url: string) => call<boolean>("open_url", { url }),
+  /** A web page's text (https), fetched by Rust. */
+  fetchText: (url: string) => invokeOrError<string>("fetch_text", { url }),
   locksGet: () => call<{ caps: boolean; num: boolean; scroll: boolean }>("locks_get"),
   /** Opens a file (reveal: its folder, with it selected). */
   openPath: (path: string, reveal = false) => call<boolean>("open_path", { path, reveal }),
@@ -73,6 +82,28 @@ export const Bridge = {
     call<void>("popup_open", { label, page: `${label}.html`, data, width, height, place }),
   popupClose: (label: "alert" | "rest") => call<void>("popup_close", { label }),
 };
+
+export interface SysInfoRaw {
+  cpu: number;
+  ramUsed: number;
+  ramTotal: number;
+  gpu: number;
+  vramUsed: number;
+  vramTotal: number;
+  down: number;
+  up: number;
+  diskUsed: number;
+  diskTotal: number;
+  uptime: number;
+}
+
+export interface WinState {
+  dark: boolean | null;
+  airplane: boolean | null;
+  power: "saver" | "balanced" | "performance" | null;
+  binItems: number;
+  binBytes: number;
+}
 
 export interface Sound {
   /** 0–1; -1 without an output device. */

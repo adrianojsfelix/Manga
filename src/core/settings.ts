@@ -1,4 +1,6 @@
 import { DEFAULT_PREFS, sanitizePrefs, type FocusPrefs } from "../focus/timer.ts";
+import type { Page, Rest } from "./island-state.ts";
+import { DEFAULT_FEEDS } from "../tools/feeds.ts";
 
 // What the user sets, saved in the page's storage (never the API keys: those
 // go to Windows' Credential Manager through Rust). Pure: tested on its own.
@@ -33,11 +35,26 @@ export interface Settings {
   island: {
     shape: "notch" | "floating";
     /** The size it rests at. */
-    rest: "small" | "medium";
+    rest: Rest;
     /** 0.8–1.4. */
     scale: number;
+    /** The small island's middle: the time, the date and time, or Manga's eyes. */
+    center: "clock" | "datetime" | "eyes";
+    /** The pages in the dock (and the bars' tools), in order. */
+    dock: Page[];
+  };
+  /** The control center's buttons, in order. */
+  controls: string[];
+  tools: {
+    /** News feeds (RSS). */
+    feeds: string[];
+    /** Pinterest boards ("user/board" or links). */
+    pins: string[];
   };
 }
+
+export const DOCK_PAGES: Page[] = ["home", "assistant", "media", "focus", "controls", "system", "tools", "notes", "today"];
+export const DEFAULT_CONTROLS = ["wifi", "bluetooth", "dnd", "mic", "airplane", "dark", "power", "lock"];
 
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 
@@ -103,7 +120,9 @@ export const DEFAULT_SETTINGS: Settings = {
   notifications: { on: true, ignored: [], seconds: 6, quiet: false },
   focus: DEFAULT_FOCUS,
   claudeCode: { ask: true },
-  island: { shape: "notch", rest: "small", scale: 1 },
+  island: { shape: "notch", rest: "small", scale: 1, center: "clock", dock: ["home", "assistant", "media", "focus", "controls", "system", "tools", "today"] },
+  controls: DEFAULT_CONTROLS,
+  tools: { feeds: DEFAULT_FEEDS, pins: [] },
 };
 
 
@@ -113,6 +132,10 @@ function ai(raw: unknown, fallback: AiPrefs): AiPrefs {
     mode: r.mode === "subscription" || r.mode === "key" ? r.mode : fallback.mode,
     model: typeof r.model === "string" ? r.model.trim().slice(0, 80) : fallback.model,
   };
+}
+
+function strings(v: unknown, def: string[]): string[] {
+  return Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === "string" && x.trim() !== "").map((x) => x.trim()))].slice(0, 20) : def;
 }
 
 export function sanitizeSettings(raw: unknown): Settings {
@@ -133,9 +156,16 @@ export function sanitizeSettings(raw: unknown): Settings {
     },
     focus: sanitizeFocus(r.focus),
     claudeCode: { ask: typeof obj(r.claudeCode).ask === "boolean" ? (obj(r.claudeCode).ask as boolean) : d.claudeCode.ask },
+    controls: Array.isArray(r.controls) ? [...new Set(r.controls.filter((c): c is string => typeof c === "string"))].slice(0, 30) : d.controls,
+    tools: {
+      feeds: strings(obj(r.tools).feeds, d.tools.feeds),
+      pins: strings(obj(r.tools).pins, d.tools.pins),
+    },
     island: {
       shape: i.shape === "floating" || i.shape === "notch" ? i.shape : d.island.shape,
-      rest: i.rest === "medium" || i.rest === "small" ? i.rest : d.island.rest,
+      rest: (["small", "medium", "bar", "wide"] as const).includes(i.rest as Rest) ? (i.rest as Rest) : d.island.rest,
+      center: i.center === "datetime" || i.center === "eyes" || i.center === "clock" ? i.center : d.island.center,
+      dock: Array.isArray(i.dock) ? [...new Set(i.dock.filter((p): p is Page => DOCK_PAGES.includes(p as Page)))] : d.island.dock,
       scale: typeof i.scale === "number" && Number.isFinite(i.scale) ? Math.round(Math.min(1.4, Math.max(0.8, i.scale)) * 20) / 20 : d.island.scale,
     },
   };

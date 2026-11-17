@@ -12,6 +12,9 @@ import { ago, type Notice } from "../notify/notices.ts";
 import { language } from "../core/i18n.ts";
 import type { AlertMood, AlertPlace, FocusSettings } from "../core/settings.ts";
 import { TONES, playTone } from "../focus/tones.ts";
+import { DOCK_PAGES } from "../core/settings.ts";
+import type { Page } from "../core/island-state.ts";
+import { BUILT_PHASE, ITEMS, type ItemId, type ItemPrefs } from "../items/registry.ts";
 
 type Tab = "assistant" | "claude" | "focus" | "notifications" | "island";
 
@@ -32,6 +35,7 @@ export class SettingsView {
     private recent: () => readonly Notice[],
     private sessions: () => readonly Session[],
     private hold: (on: boolean) => void,
+    private items: { get: () => ItemPrefs; set: (i: ItemPrefs) => void } = { get: () => ({ small: [], medium: [] }), set: () => {} },
   ) {
     void this.checkKeys();
     void this.checkClaudeCode();
@@ -237,7 +241,7 @@ export class SettingsView {
     card.append(
       this.row(t("Where"), this.segmented<AlertPlace>(a.place, [["center", t("Center")], ["top", t("Top")], ["island", t("On the island")]], (place) => setA({ place }))),
       this.row(
-        t("Kumo's reaction"),
+        t("Manga's reaction"),
         this.segmented<AlertMood>(a.mood, [["proud", t("Proud")], ["happy", t("Happy")], ["love", t("Love")], ["surprised", t("Surprised")], ["sleepy", t("Sleepy")]], (mood) => setA({ mood })),
       ),
       this.row(t("Colour"), colors),
@@ -344,11 +348,32 @@ export class SettingsView {
     body.append(list);
   }
 
+  /** Toggle chips that keep the order they were picked in (numbered). */
+  private picker<T extends string>(all: { id: T; name: string }[], chosen: T[], max: number, set: (v: T[]) => void) {
+    const box = el("div", "set-chips");
+    for (const o of all) {
+      const n = chosen.indexOf(o.id);
+      const b = el("button", `chip${n >= 0 ? " on" : ""}`, n >= 0 && max > 1 ? `${n + 1}. ${o.name}` : o.name);
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (n >= 0) set(chosen.filter((x) => x !== o.id));
+        else if (chosen.length < max) set([...chosen, o.id]);
+        this.paint();
+      });
+      box.append(b);
+    }
+    return box;
+  }
+
   private island(body: HTMLElement) {
     const s = this.settings();
     const i = s.island;
     const setI = (p: Partial<typeof i>) => this.change({ island: { ...i, ...p } });
-    const box = el("div", "set-box");
+    const items = this.items.get();
+    const built = ITEMS.filter((x) => x.phase <= BUILT_PHASE);
+
+    const look = el("div", "set-box");
+    look.append(el("div", "set-title", t("Island")));
     const scale = el("input", "set-range");
     scale.type = "range";
     scale.min = "0.8";
@@ -356,11 +381,36 @@ export class SettingsView {
     scale.step = "0.05";
     scale.value = String(i.scale);
     scale.addEventListener("change", () => setI({ scale: Number(scale.value) }));
-    box.append(
+    look.append(
       this.row(t("Shape"), this.segmented(i.shape, [["notch", t("Notch")], ["floating", t("Floating")]], (shape) => setI({ shape }))),
-      this.row(t("At rest"), this.segmented(i.rest, [["small", t("Small")], ["medium", t("Medium")]], (rest) => setI({ rest }))),
+      this.row(
+        t("At rest"),
+        this.segmented(i.rest, [["small", t("Small")], ["medium", t("Medium")], ["bar", t("Bar")], ["wide", t("Wide bar")]], (rest) => setI({ rest })),
+      ),
       this.row(t("Size"), scale),
     );
-    body.append(box);
+    body.append(look);
+
+    const small = el("div", "set-box");
+    small.append(el("div", "set-title", t("Small island")));
+    small.append(
+      this.row(t("In the middle"), this.segmented(i.center, [["clock", t("Clock")], ["datetime", t("Day and time")], ["eyes", t("Manga's eyes")]], (center) => setI({ center }))),
+      this.row(t("Each side (2 at most)"), this.picker(built.filter((x) => x.id !== "clock").map((x) => ({ id: x.id, name: t(x.name) })), items.small, 2, (small) => this.items.set({ ...items, small: small as ItemId[] }))),
+      el("p", "set-note", t("What is going on takes a side for a while: the cover of a song, a download, a countdown.")),
+    );
+    body.append(small);
+
+    const medium = el("div", "set-box");
+    medium.append(el("div", "set-title", t("Medium island and bars")));
+    medium.append(this.picker(built.map((x) => ({ id: x.id, name: t(x.name) })), items.medium, 10, (m) => this.items.set({ ...items, medium: m as ItemId[] })));
+    medium.append(el("p", "set-note", t("In the order you pick them. The bars also show the tools below.")));
+    body.append(medium);
+
+    const open = el("div", "set-box");
+    open.append(el("div", "set-title", t("Open island: the dock's tabs")));
+    const names: Record<string, string> = { home: "Home", assistant: "Assistant", media: "Media", focus: "Focus", controls: "Controls", system: "System", tools: "Utilities", notes: "Notes", today: "Today" };
+    open.append(this.picker(DOCK_PAGES.map((p) => ({ id: p, name: t(names[p]) })), i.dock, 9, (dock) => setI({ dock: dock as Page[] })));
+    body.append(open);
   }
+
 }

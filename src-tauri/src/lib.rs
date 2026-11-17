@@ -1,5 +1,6 @@
 // Manga: an island at the top of Windows.
 
+mod actions;
 mod audio;
 mod brightness;
 mod chat;
@@ -11,6 +12,7 @@ mod pip;
 mod popup;
 mod radios;
 mod secrets;
+mod sysinfo;
 mod system;
 #[cfg(windows)]
 mod winsqlite;
@@ -43,11 +45,14 @@ pub fn run() {
             audio::sound_level,
             radios::radios_get,
             radios::radio_set,
-            brightness::brightness_get,
+            brightness::brightness_list,
             brightness::brightness_set,
             pip::pip_windows,
             pip::pip_open,
             pip::pip_close,
+            pip::media_live,
+            pip::media_live_off,
+            system::fetch_text,
             system::locks_get,
             system::open_path,
             system::downloads_folder,
@@ -55,6 +60,10 @@ pub fn run() {
             system::download_url,
             popup::popup_open,
             popup::popup_close,
+            sysinfo::sysinfo,
+            actions::win_state,
+            actions::win_action,
+            actions::open_url,
         ])
         .setup(|app| {
             let handle = app.handle().clone();

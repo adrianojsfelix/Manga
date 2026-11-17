@@ -236,7 +236,10 @@ export class FocusView {
     vol.addEventListener("click", (ev) => ev.stopPropagation());
     vol.addEventListener("input", () => this.setVolume(Number(vol.value) / 100));
     const volRow = el("div", "f-vol-row");
-    volRow.append(icon(I.volume, 14), vol);
+    const pct = el("span", "f-vol-pct", `${vol.value}%`);
+    vol.addEventListener("input", () => (pct.textContent = `${vol.value}%`));
+    volRow.append(icon(I.volume, 14), vol, pct);
+    box.append(el("span", "f-vol-label", t("Volume (lofi and YouTube)")));
     box.append(volRow);
     return box;
   }

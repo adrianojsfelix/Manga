@@ -55,6 +55,19 @@ Cada fase termina com o app funcionando, testado e checado contra o Windows.
 - ✅ **Contador na ilha** do que estiver correndo (na pequena e no topo).
 - Depois: arquivos de som seus como toque, adiar a pausa.
 
+## Extras pedidos depois da fase 4 ✅
+- Ilha pequena com o relógio (ou dia e hora, ou os olhos do Manga) e um item
+  de cada lado; personalização da pequena, da média/barras e das abas do dock.
+- Modos **barra** e **barra larga**, com os ícones das ferramentas.
+- O mascote se chama **Manga** e aparece no Início.
+- Vídeo **ao vivo** no player (miniatura do Windows da janela que toca).
+- Central de controle **editável**: modo avião, modo escuro, modo de energia,
+  bloquear, suspender, reiniciar, desligar, lixeira, área de trabalho,
+  captura, apps e páginas do Windows; **brilho de cada tela** (DDC/CI).
+- Aba **Sistema**: CPU, memória, GPU, VRAM, download, upload, disco.
+- Aba **Utilitários**: calculadora, cotações (dólar, euro, bitcoin…),
+  notícias (RSS) e pastas do Pinterest.
+
 ## Fase 5 — O dia
 - Página **Hoje**: notificações, o que toca, próximo evento, tarefas, água.
 - **Relógio** (e outras cidades), **clima** (agora, próximas horas, semana),
