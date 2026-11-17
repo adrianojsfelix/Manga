@@ -10,6 +10,7 @@ mod notifications;
 mod pip;
 mod radios;
 mod secrets;
+mod system;
 #[cfg(windows)]
 mod winsqlite;
 
@@ -42,6 +43,11 @@ pub fn run() {
             pip::pip_windows,
             pip::pip_open,
             pip::pip_close,
+            system::locks_get,
+            system::open_path,
+            system::downloads_folder,
+            system::app_icon,
+            system::download_url,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
@@ -49,6 +55,7 @@ pub fn run() {
             notifications::start(handle.clone());
             claude_code::start(handle.clone());
             media::start(handle.clone());
+            system::start(handle.clone());
             // The tray: the only way out while the island has no menu of its own.
             let quit = MenuItem::with_id(app, "quit", "Sair do Manga", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&quit])?;

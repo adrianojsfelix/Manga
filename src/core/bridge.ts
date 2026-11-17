@@ -60,6 +60,14 @@ export const Bridge = {
   pipWindows: () => call<PipSource[]>("pip_windows"),
   pipOpen: (source?: number) => invokeOrError<PipSource>("pip_open", { source: source ?? null }),
   pipClose: () => call<void>("pip_close"),
+  locksGet: () => call<{ caps: boolean; num: boolean; scroll: boolean }>("locks_get"),
+  /** Opens a file (reveal: its folder, with it selected). */
+  openPath: (path: string, reveal = false) => call<boolean>("open_path", { path, reveal }),
+  downloadsFolder: () => call<string>("downloads_folder"),
+  /** An app's icon, as a data: URL. */
+  appIcon: (aumid: string) => call<string | null>("app_icon", { aumid }),
+  /** Downloads a link to the Downloads folder (progress: "download" events). */
+  downloadUrl: (url: string) => invokeOrError<string>("download_url", { url }),
 };
 
 export interface Sound {

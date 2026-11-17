@@ -2,9 +2,10 @@
 // microphone; the brightness and the volume; each app's volume.
 
 import { Bridge, IN_APP, type Sound } from "../core/bridge.ts";
-import { t } from "../core/i18n.ts";
-import { el, icon } from "../island/dom.ts";
+import { language, t } from "../core/i18n.ts";
+import { el, icon, typing } from "../island/dom.ts";
 import { I } from "../island/icons.ts";
+import { percent, progressText, type Download } from "../system/activity.ts";
 
 type Radio = { kind: "wifi" | "bluetooth"; on: boolean };
 
@@ -49,10 +50,41 @@ export class ControlsView {
   private timer: number | null = null;
   private dragging = false;
 
+  private downloads: Download[] = [];
+  private linkError = "";
+  private link = el("input", "set-input dl-link");
+
   constructor(
     private quiet: () => boolean,
     private setQuiet: (on: boolean) => void,
-  ) {}
+    hold: (on: boolean) => void,
+  ) {
+    this.link.placeholder = t("Paste a link to download");
+    this.link.spellcheck = false;
+    typing(this.link, hold);
+    this.link.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") void this.fetchLink();
+    });
+  }
+
+  setDownloads(list: Download[]) {
+    this.downloads = list;
+    this.paint();
+  }
+
+  private async fetchLink() {
+    const url = this.link.value.trim();
+    if (!url) return;
+    if (!IN_APP) {
+      this.linkError = t("Downloads start in the app.");
+      this.paint();
+      return;
+    }
+    const r = await Bridge.downloadUrl(url);
+    this.linkError = "error" in r ? r.error : "";
+    if (!("error" in r)) this.link.value = "";
+    this.paint();
+  }
 
   /** Reads everything again; while the page is open, the sound every few seconds. */
   async open() {
@@ -120,7 +152,8 @@ export class ControlsView {
   }
 
   paint() {
-    if (this.dragging) return;
+    // Not while a slider is held or a link is being typed (it would lose the focus).
+    if (this.dragging || document.activeElement === this.link) return;
     this.el.replaceChildren();
     const s = this.sound;
     const left = el("div", "ctl-left");
@@ -199,6 +232,29 @@ export class ControlsView {
       row.append(el("span", "app-name", a.name), sl, mute);
       apps.append(row);
     }
+    // Downloads: a link to fetch, and what is downloading.
+    const dl = el("div", "ctl-dl");
+    const go = el("button", "set-btn", t("Download"));
+    go.addEventListener("click", (e) => {
+      e.stopPropagation();
+      void this.fetchLink();
+    });
+    const row = el("div", "ctl-dl-row");
+    row.append(this.link, go);
+    dl.append(row);
+    if (this.linkError) dl.append(el("p", "set-note error", this.linkError));
+    for (const d of this.downloads) {
+      const item = el("div", `dl-item${d.state === "done" ? " done" : ""}`);
+      const bar = el("div", "dl-bar");
+      const fill = el("div", "dl-fill");
+      const p = percent(d);
+      fill.style.width = p == null ? "35%" : `${p}%`;
+      if (p == null) fill.classList.add("indeterminate");
+      bar.append(fill);
+      item.append(el("span", "dl-name", d.name), bar, el("span", "dl-text", progressText(d, language())));
+      dl.append(item);
+    }
+    left.append(dl);
     this.el.append(left, apps);
   }
 }

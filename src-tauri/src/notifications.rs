@@ -15,6 +15,8 @@ static WATCHING: AtomicBool = AtomicBool::new(true);
 pub struct Notice {
     pub id: i64,
     pub app: String,
+    /// The app's AppUserModelID (for its icon).
+    pub aumid: String,
     pub title: String,
     pub body: String,
     /// Unix ms.
@@ -65,9 +67,10 @@ mod imp {
                 let id = r.int(0);
                 if title.is_empty() && body.is_empty() {
                     // Still moves the reading on.
-                    return Some(Notice { id, app: String::new(), title, body, at: 0 });
+                    return Some(Notice { id, app: String::new(), aumid: String::new(), title, body, at: 0 });
                 }
-                Some(Notice { id, app: app_name(&r.text(3, 512)), title, body, at: filetime_to_ms(r.int(1)) })
+                let aumid = r.text(3, 512);
+                Some(Notice { id, app: app_name(&aumid), aumid, title, body, at: filetime_to_ms(r.int(1)) })
             },
         )
     }

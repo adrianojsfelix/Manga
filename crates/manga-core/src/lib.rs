@@ -8,3 +8,5 @@ pub mod sse;
 pub mod hooks;
 pub mod http;
 pub mod media;
+pub mod downloads;
+pub mod png;

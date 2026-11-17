@@ -21,7 +21,12 @@ import { language, t } from "../core/i18n.ts";
 import type { Settings } from "../core/settings.ts";
 import { itemView, type ItemContext, type ItemPrefs } from "../items/registry.ts";
 import { Kumo, drawGlowEyes } from "../mascot/kumo.ts";
+import { Banner } from "../notify/banner.ts";
+import { InboxView } from "../notify/inbox-view.ts";
 import { remember, shows, type Notice } from "../notify/notices.ts";
+import { lockChange, merge, percent, progressText, type Download, type Locks, type Shot } from "../system/activity.ts";
+import { Hud } from "../system/hud.ts";
+import { I } from "./icons.ts";
 import { SettingsView } from "../settings/settings-view.ts";
 import { Canvas, el, icon } from "./dom.ts";
 
@@ -41,6 +46,7 @@ const ICON: Record<Page, string> = {
   focus: "M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM12 9v4l2.5 2M10 2.5h4",
   controls: "M4 7h9M17 7h3M4 17h3M11 17h9M15 5v4M9 15v4",
   notes: "M6 3.5h9l3.5 3.5v13.5H6zM9 10h6M9 13.5h6M9 17h4",
+  inbox: "M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0",
   settings:
     "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 13.5l1.6 1.2-2 3.4-1.9-.7a7 7 0 0 1-2 1.2L14.8 21h-4l-.3-2.4a7 7 0 0 1-2-1.2l-1.9.7-2-3.4 1.6-1.2a7 7 0 0 1 0-2.4L4.6 9.9l2-3.4 1.9.7a7 7 0 0 1 2-1.2l.3-2.4h4l.3 2.4a7 7 0 0 1 2 1.2l1.9-.7 2 3.4-1.6 1.2a7 7 0 0 1 0 2.4z",
 };
@@ -53,11 +59,12 @@ const PAGES: { id: Page; label: string; phase: number }[] = [
   { id: "controls", label: "Controls", phase: 3 },
   { id: "notes", label: "Notes", phase: 5 },
   { id: "settings", label: "Settings", phase: 2 },
+  { id: "inbox", label: "Notifications", phase: 2 },
 ];
 
-/** The banner's height, unscaled. */
-const NOTICE_HEIGHT = 74;
-const NOTICE_WIDTH = 420;
+/** The banner's size, unscaled. */
+const NOTICE_HEIGHT = 84;
+const NOTICE_WIDTH = 440;
 /** Claude Code waiting: the panel's width, unscaled. */
 const ASK_WIDTH = 560;
 const HEAD = 36;
@@ -86,9 +93,17 @@ export class Island {
   private eyesSmall = new Canvas(36, 22, "eyes-small", (x) => drawGlowEyes(x, this.kumo, 36, 22, 7));
   private menu = el("button", "head-menu", "···");
   // A notification.
-  private banner = el("div", "banner");
-  private notice: Notice | null = null;
-  private noticeTimer: number | null = null;
+  private banner: Banner;
+  private inbox: InboxView;
+  private hud = new Hud(() => this.render());
+  private locks: Locks = { caps: false, num: false, scroll: false };
+  private downloads: Download[] = [];
+  private downloadsDir = "";
+  private bell = el("button", "head-bell");
+  private countBadge = el("span", "count-badge");
+  private capsSmall = el("span", "caps-small", "A");
+  private ring = el("span", "dl-ring");
+  private smallFace = el("div", "small-face");
   private recent: Notice[] = [];
   private unread = 0;
   private battery: ItemContext["battery"] = null;
@@ -132,11 +147,38 @@ export class Island {
     this.controlsView = new ControlsView(
       () => this.settings.notifications.quiet,
       (quiet) => this.change({ notifications: { ...this.settings.notifications, quiet } }),
+      hold("controls"),
     );
     this.settingsView = new SettingsView(() => this.settings, change, () => this.recent, () => this.sessions, hold("settings"));
+    this.banner = new Banner(
+      this.kumo,
+      () => this.settings.notifications.seconds,
+      () => this.render(),
+      () => this.dispatch({ type: "open", page: "inbox" }),
+    );
+    this.inbox = new InboxView(
+      () => this.recent,
+      (id) => {
+        this.recent = id == null ? [] : this.recent.filter((n) => n.id !== id);
+        this.inbox.paint();
+        this.renderHead();
+      },
+      (app) => {
+        const n = this.settings.notifications;
+        if (!n.ignored.includes(app)) this.change({ notifications: { ...n, ignored: [...n.ignored, app] } });
+        this.recent = this.recent.filter((x) => x.app !== app);
+        this.inbox.paint();
+      },
+    );
+    this.bell.append(icon(I.bell, 14));
+    this.bell.title = t("Notifications");
+    this.bell.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.dispatch({ type: "open", page: "inbox" });
+    });
 
-    const small = el("div", "small-face");
-    small.append(this.miniCover, this.eyesBig.el, this.wavesSmall.el);
+    const small = this.smallFace;
+    small.append(this.miniCover, this.capsSmall, this.eyesBig.el, this.countBadge, this.wavesSmall.el, this.ring);
 
     const head = el("div", "head");
     const center = el("span", "head-center");
@@ -150,7 +192,7 @@ export class Island {
       this.hold("pin", !this.holds.has("pin"));
     });
 
-    for (const p of PAGES) {
+    for (const p of PAGES.filter((x) => x.id !== "inbox")) {
       const b = el("button", "dock-btn");
       b.dataset.page = p.id;
       b.title = t(p.label);
@@ -164,15 +206,9 @@ export class Island {
     }
     this.dock.insertBefore(this.dockLabel, this.dock.querySelector(".end"));
 
-    this.banner.addEventListener("click", (e) => {
-      e.stopPropagation();
-      this.dropNotice();
-      this.dispatch({ type: "open", page: "settings" });
-    });
-
     const body = el("div", "body");
     body.append(this.page, this.dock);
-    this.clip.append(small, head, this.banner, body, this.ask.el);
+    this.clip.append(small, head, this.banner.el, body, this.hud.el, this.ask.el);
     this.shell.append(this.earL, this.earR, this.clip);
     root.append(this.shell);
 
@@ -196,6 +232,11 @@ export class Island {
     });
 
     on<Notice>("notification", (n) => this.notify(n));
+    on<Locks>("locks", (l) => this.setLocks(l));
+    on<Shot>("screenshot", (x) => this.screenshot(x));
+    on<Download[]>("download", (d) => this.download(d));
+    void Bridge.locksGet().then((l) => l && (this.locks = l) && this.render());
+    void Bridge.downloadsFolder().then((d) => (this.downloadsDir = d ?? ""));
     on<Media | null>("media", (m) => this.setMedia(m));
     window.setInterval(() => void this.listen(), 80);
     on<CcEvent>("cc-event", (e) => this.claudeCode(e));
@@ -230,18 +271,88 @@ export class Island {
       this.renderHead();
       return;
     }
-    if (!(this.state.size === "extended" && this.state.page === "settings")) this.unread++;
+    const reading = this.state.size === "extended" && this.state.page === "inbox";
+    if (!reading) this.unread++;
+    else this.inbox.paint();
+    // Kumo announces it: a jump, a bang, the banner with his face.
+    this.kumo.flash("alert", 2.2);
     if (this.state.size === "extended") {
-      // Open on a page: a little bang from Kumo, the list has it.
-      this.kumo.flash("alert", 1.4);
       this.renderHead();
       return;
     }
-    this.notice = n;
-    this.kumo.flash("surprised", 1.4);
-    if (this.noticeTimer != null) window.clearTimeout(this.noticeTimer);
-    this.noticeTimer = window.setTimeout(() => this.dropNotice(), s.seconds * 1000);
+    this.banner.push(n);
+  }
+
+  /** A lock key changed (the page's console can call it too). */
+  setLocks(l: Locks) {
+    const change = lockChange(this.locks, l);
+    this.locks = l;
+    if (change) {
+      if (change.on) this.kumo.flash("surprised", 0.8);
+      this.hud.show({ kind: "lock", ...change });
+    } else this.render();
+  }
+
+  /** A new screenshot (the page's console can call it too). */
+  screenshot(x: Shot) {
+    this.kumo.flash("happy", 1.6);
+    this.hud.show({ kind: "shot", shot: x });
+  }
+
+  /** Downloads' news (the page's console can call it too). */
+  download(news: Download[]) {
+    this.downloads = merge(this.downloads, news);
+    for (const d of news) {
+      if (d.state !== "done") continue;
+      this.kumo.flash("proud", 2);
+      this.hud.show({ kind: "done", download: d, folder: this.downloadsDir });
+      // The finished one stays a moment, its ring full and green.
+      window.setTimeout(() => {
+        this.downloads = this.downloads.filter((x) => x.id !== d.id);
+        this.render();
+      }, 3000);
+    }
+    if (this.shownPage === "controls") this.controlsView.setDownloads(this.downloads);
     this.render();
+  }
+
+  /** The download the island shows: the newest still going, or one just done. */
+  private shownDownload(): Download | null {
+    return this.downloads.filter((d) => d.state === "downloading").at(-1) ?? this.downloads.at(-1) ?? null;
+  }
+
+  private paintRing() {
+    const d = this.shownDownload();
+    this.ring.replaceChildren();
+    this.ring.classList.toggle("done", d?.state === "done");
+    if (!d) return;
+    const p = percent(d);
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 20 20");
+    svg.setAttribute("width", "18");
+    svg.setAttribute("height", "18");
+    const track = document.createElementNS(ns, "circle");
+    const arc = document.createElementNS(ns, "circle");
+    for (const c of [track, arc]) {
+      c.setAttribute("cx", "10");
+      c.setAttribute("cy", "10");
+      c.setAttribute("r", "8");
+      c.setAttribute("fill", "none");
+      c.setAttribute("stroke-width", "2.6");
+    }
+    track.setAttribute("stroke", "rgba(255,255,255,0.18)");
+    arc.setAttribute("stroke", d.state === "done" ? "#34c759" : "#7fd4ff");
+    arc.setAttribute("stroke-linecap", "round");
+    arc.setAttribute("transform", "rotate(-90 10 10)");
+    const len = 2 * Math.PI * 8;
+    arc.setAttribute("stroke-dasharray", `${len}`);
+    arc.setAttribute("stroke-dashoffset", `${p == null ? len * 0.7 : len * (1 - p / 100)}`);
+    if (p == null) arc.classList.add("spin");
+    svg.append(track, arc);
+    const label = d.state === "done" ? icon(I.check, 13) : el("span", "", p == null ? progressText(d, language()).split(" · ")[0] : `${p}%`);
+    this.ring.append(svg, label);
+    this.ring.title = `${d.name} — ${progressText(d, language())}`;
   }
 
   /** What plays now (the page's console can call it too). */
@@ -340,14 +451,6 @@ export class Island {
     this.ask.add(a);
   }
 
-  private dropNotice() {
-    if (this.noticeTimer != null) window.clearTimeout(this.noticeTimer);
-    this.noticeTimer = null;
-    if (!this.notice) return;
-    this.notice = null;
-    this.render();
-  }
-
   private hold(why: string, onIt: boolean) {
     if (onIt) this.holds.add(why);
     else this.holds.delete(why);
@@ -398,9 +501,19 @@ export class Island {
       return { ...box, width, height: HEAD + this.ask.el.offsetHeight, radius: Math.round(24 * k) };
     }
     this.ask.paint();
-    if (!this.notice || s.size === "extended") return box;
     const k = Math.min(1.4, Math.max(0.8, i.scale));
-    return { ...box, width: Math.max(box.width, Math.round(NOTICE_WIDTH * k)), height: Math.round(NOTICE_HEIGHT * k), radius: Math.round(22 * k) };
+    this.hud.paint();
+    if (this.hud.current && s.size !== "extended") {
+      if (this.hud.current.kind === "lock") {
+        return { ...box, width: Math.max(box.width, Math.round(280 * k)), height: Math.max(box.height, Math.round(36 * k)) };
+      }
+      const width = Math.max(box.width, Math.round(NOTICE_WIDTH * k));
+      this.hud.el.style.width = `${width}px`;
+      return { ...box, width, height: this.hud.el.offsetHeight, radius: Math.round(22 * k) };
+    }
+    this.banner.paint();
+    if (!this.banner.current || s.size === "extended") return box;
+    return { ...box, width: Math.max(box.width, Math.round(NOTICE_WIDTH * k)), height: Math.round(NOTICE_HEIGHT * k), radius: Math.round(24 * k) };
   }
 
   private render() {
@@ -410,7 +523,14 @@ export class Island {
     const box = this.box();
     const ear = earSize(box, shape);
     const asking = this.ask.current != null;
-    this.shell.className = `${s.size} ${shape}${look.glow ? " glow" : ""}${asking ? " asking" : this.notice && s.size !== "extended" ? " noticing" : ""}`;
+    const overlay = asking
+      ? " asking"
+      : this.hud.current && s.size !== "extended"
+        ? ` hudding hud-${this.hud.current.kind}`
+        : this.banner.current && s.size !== "extended"
+          ? " noticing"
+          : "";
+    this.shell.className = `${s.size} ${shape}${look.glow ? " glow" : ""}${overlay}`;
     this.shell.style.width = `${box.width}px`;
     this.shell.style.height = `${box.height}px`;
     this.shell.style.borderRadius = borderRadius(box, shape);
@@ -419,7 +539,13 @@ export class Island {
     const tint = look.tint ?? (s.size === "extended" && this.media ? this.coverTint.tint : null);
     this.shell.style.setProperty("--tint", tint ?? "none");
     const showsMedia = !!this.media?.playing && s.size === "small";
-    this.shell.classList.toggle("playing", showsMedia);
+    const dl = this.shownDownload();
+    this.shell.classList.toggle("playing", showsMedia && !dl);
+    this.shell.classList.toggle("downloading", !!dl);
+    this.shell.classList.toggle("caps", this.locks.caps);
+    this.shell.classList.toggle("unread", this.unread > 0);
+    this.countBadge.textContent = this.unread > 99 ? "99+" : String(this.unread);
+    this.paintRing();
     if (this.media?.cover) this.miniCover.style.backgroundImage = `url("${this.media.cover}")`;
     else this.miniCover.style.backgroundImage = "";
     this.shell.style.setProperty("--ear", `${ear}px`);
@@ -430,25 +556,14 @@ export class Island {
     const page = PAGES.find((p) => p.id === s.page) ?? PAGES[0];
     this.dockLabel.textContent = t(page.label);
     this.menu.classList.toggle("on", this.holds.has("pin"));
-    if (s.size === "extended" && s.page === "settings") this.unread = 0;
+    if (s.size === "extended" && s.page === "inbox") this.unread = 0;
     const open = s.size === "extended" ? s.page : null;
     if (open !== this.shownPage) {
       if (this.shownPage === "controls") this.controlsView.close();
       this.shownPage = open;
       this.renderPage(page);
     }
-    this.renderBanner();
     this.renderHead();
-  }
-
-  private renderBanner() {
-    const n = this.notice;
-    this.banner.replaceChildren();
-    if (!n) return;
-    const badge = el("span", "banner-badge", (n.app.trim()[0] ?? "?").toUpperCase());
-    const text = el("div", "banner-text");
-    text.append(el("span", "banner-app", n.app), el("b", "banner-title", n.title || n.body), el("span", "banner-body", n.title ? n.body : ""));
-    this.banner.append(badge, text);
   }
 
   private renderHead() {
@@ -458,12 +573,21 @@ export class Island {
     this.headRight.textContent = now.toLocaleTimeString(language(), { hour: "2-digit", minute: "2-digit" });
     // The medium island's other items (not the clock and date, already there).
     this.headItems.replaceChildren();
+    if (this.state.size === "small") this.smallFace.append(this.ring);
     if (this.state.size !== "small") {
+      if (this.locks.caps) this.headItems.append(el("span", "head-item item-caps", "CAPS"));
+      if (this.shownDownload()) this.headItems.append(this.ring);
       const busy = this.sessions.filter((x) => x.state === "working");
       if (busy.length) this.headItems.append(el("span", "head-item item-cc", busy.length > 1 ? t("{n} sessions", { n: busy.length }) : busy[0].project));
       const ctx: ItemContext = { battery: this.battery, unread: this.unread };
       for (const id of this.items.medium) {
         if (id === "clock" || id === "date") continue;
+        if (id === "notifications") {
+          this.bell.classList.toggle("has", this.unread > 0);
+          this.bell.dataset.count = this.unread > 99 ? "99+" : String(this.unread);
+          this.headItems.append(this.bell);
+          continue;
+        }
         if (id === "waves") {
           if (this.media?.playing) this.headItems.append(this.wavesHead.el);
           continue;
@@ -504,7 +628,7 @@ export class Island {
           : card("KUMO", t("Hi!"), t("Ask me anything"), "c-kumo", "assistant"),
         this.mediaCard(card),
         last
-          ? card(t("NOTIFICATIONS"), last.title || last.app, last.app, "c-focus c-notice", "settings")
+          ? card(t("NOTIFICATIONS"), last.title || last.app, last.app, "c-focus c-notice", "inbox")
           : card(t("FOCUS"), "25:00", t("Ready"), "c-focus"),
       );
       this.page.append(cards);
@@ -516,12 +640,18 @@ export class Island {
       this.chat.focus();
       return;
     }
+    if (page.id === "inbox") {
+      this.inbox.paint();
+      this.page.append(this.inbox.el);
+      return;
+    }
     if (page.id === "media") {
       this.mediaView.paint();
       this.page.append(this.mediaView.el);
       return;
     }
     if (page.id === "controls") {
+      this.controlsView.setDownloads(this.downloads);
       this.page.append(this.controlsView.el);
       void this.controlsView.open();
       return;
@@ -549,7 +679,8 @@ export class Island {
   private lastMinute = -1;
   private loop() {
     const frame = () => {
-      if (this.state.size === "small" && !this.notice) {
+      this.banner.frame();
+      if (this.state.size === "small" && !this.banner.current) {
         this.eyesBig.draw();
         if (this.media?.playing) this.wavesSmall.draw();
       } else {

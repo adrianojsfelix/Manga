@@ -243,46 +243,6 @@ body.browser {
 .card.go:hover { filter: brightness(1.12); }
 .c-notice .card-big { font-size: 15px; font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
 
-/* A Windows notification, dropped from the notch. */
-.banner {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 30px;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 18px 8px;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-6px);
-  transition: opacity 0.2s ease, transform 0.25s ease;
-  cursor: pointer;
-}
-
-#island.noticing .banner { opacity: 1; pointer-events: auto; transform: none; transition-delay: 0.12s; }
-#island.noticing .head { opacity: 1; }
-#island.noticing .small-face { opacity: 0; }
-
-.banner-badge {
-  flex: 0 0 auto;
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
-  display: grid;
-  place-items: center;
-  background: linear-gradient(160deg, #6d5bd0, #3a2d86);
-  font-weight: 700;
-  font-size: 14px;
-}
-
-.banner-text { min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
-.banner-app { font-size: 10.5px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.06em; }
-.banner-title, .banner-body { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.banner-title { font-size: 13px; }
-.banner-body { font-size: 12px; color: #cfc9dc; }
-
 .item-notifications { color: #f5a524; }
 
 /* The assistant. */
@@ -610,3 +570,168 @@ body.browser {
 .app-vol.active .app-name { color: var(--ink); }
 .app-mute { width: 26px; height: 26px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--dim); }
 .app-mute:hover { background: rgba(255, 255, 255, 0.08); color: var(--ink); }
+
+/* A Windows notification, dropped from the notch, announced by Kumo. */
+.banner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px 8px 16px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-8px) scale(0.98);
+  transition: opacity 0.2s ease, transform 0.3s cubic-bezier(0.2, 0.9, 0.25, 1.2);
+  cursor: pointer;
+}
+#island.noticing .banner { opacity: 1; pointer-events: auto; transform: none; transition-delay: 0.1s; }
+#island.noticing .head, #island.noticing .small-face { opacity: 0; pointer-events: none; }
+.banner-who { position: relative; flex: 0 0 auto; width: 52px; height: 52px; }
+.banner-kumo { position: absolute; left: 0; top: 0; animation: hop 0.6s ease 0.15s 2; }
+@keyframes hop { 40% { transform: translateY(-5px); } }
+.banner-icon {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: #333 center / contain no-repeat;
+  box-shadow: 0 0 0 2px #000;
+}
+.banner-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; line-height: 1.28; }
+.banner-say { font-size: 11px; color: #ffcf8a; font-weight: 600; }
+.banner-title, .banner-body { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.banner-title { font-size: 13.5px; }
+.banner-body { font-size: 12px; color: #cfc9dc; }
+.banner-side { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 6px; align-self: stretch; justify-content: space-between; padding: 2px 0; }
+.banner-close { width: 22px; height: 22px; display: grid; place-items: center; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.1); color: var(--dim); }
+.banner-close:hover { background: rgba(255, 255, 255, 0.2); color: #fff; }
+.banner-more { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: #ff453a; color: #fff; }
+
+/* The count: a bell in the header, a red badge by the eyes when small. */
+.head-bell { position: relative; border: 0; background: transparent; color: #a59f95; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; padding: 0; }
+.head-bell:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.head-bell.has { color: #fff; }
+.head-bell.has::after {
+  content: attr(data-count);
+  position: absolute;
+  top: -3px;
+  left: 12px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #ff453a;
+  color: #fff;
+  font: 700 9.5px/15px var(--font);
+  letter-spacing: 0;
+  text-align: center;
+}
+.count-badge {
+  position: absolute;
+  top: 50%;
+  left: calc(50% + 24px);
+  margin-top: -8px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #ff453a;
+  color: #fff;
+  font: 700 10px/16px var(--font);
+  text-align: center;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.2, 0.9, 0.25, 1.4);
+}
+#island.unread .count-badge { opacity: 1; transform: none; }
+
+/* Caps Lock on: a small "A" while small, CAPS in the header. */
+.caps-small {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  margin-top: -9px;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid #ffd9b3;
+  color: #ffd9b3;
+  font: 800 10.5px/15px var(--font);
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+#island.caps:not(.playing) .caps-small { opacity: 1; }
+.item-caps { font-size: 10px; line-height: 14px; font-weight: 700; padding: 0 5px; border-radius: 4px; border: 1px solid #ffd9b3; color: #ffd9b3; letter-spacing: 0.08em; }
+
+/* A download: a ring with the percent, then a green check. */
+.dl-ring { display: inline-flex; align-items: center; gap: 4px; font: 600 10.5px var(--font); color: #7fd4ff; letter-spacing: 0; }
+.dl-ring.done { color: #34c759; }
+.dl-ring .spin { animation: spin 1s linear infinite; transform-origin: 10px 10px; }
+@keyframes spin { to { transform: rotate(270deg); } }
+.small-face .dl-ring { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); opacity: 0; transition: opacity 0.2s ease; }
+#island.downloading .small-face .dl-ring { opacity: 1; }
+#island.downloading .mini-waves { opacity: 0; }
+.dl-ring.done svg { animation: pop 0.4s cubic-bezier(0.2, 0.9, 0.25, 1.6); }
+@keyframes pop { 0% { transform: scale(0.6); } }
+
+/* Quick news: a lock key, a screenshot, a download done. */
+.hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+#island.hudding .hud { opacity: 1; pointer-events: auto; transition-delay: 0.1s; }
+#island.hudding .head, #island.hudding .small-face, #island.hudding .banner { opacity: 0; pointer-events: none; }
+.hud.lock { right: 0; bottom: 0; padding: 0 16px; width: auto !important; justify-content: space-between; }
+.hud-lock { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 7px; background: rgba(255, 255, 255, 0.1); color: var(--dim); }
+.hud-lock.on { background: #ffd9b3; color: #1b1410; }
+.hud-lock-name { flex: 1 1 auto; font-size: 13px; font-weight: 600; }
+.hud-state { font-size: 12px; color: var(--dim); }
+.hud-state.on { color: #ffd9b3; }
+.hud.shot, .hud.done { padding: 14px 16px 14px 16px; }
+.hud-thumb { flex: 0 0 auto; width: 96px; height: 60px; border-radius: 10px; background: #1b1726 center / cover; display: grid; place-items: center; color: var(--dim); }
+.hud-check { flex: 0 0 auto; width: 46px; height: 46px; border-radius: 50%; background: #34c759; color: #fff; display: grid; place-items: center; animation: pop 0.45s cubic-bezier(0.2, 0.9, 0.25, 1.6); }
+.hud-check svg path { stroke-width: 2.6; }
+.hud-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.hud-text b { font-size: 13.5px; }
+.hud-text > span { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hud-row { display: flex; gap: 6px; margin-top: 4px; }
+.hud-btn { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border: 0; border-radius: 8px; background: rgba(255, 255, 255, 0.1); color: var(--ink); font: 12px var(--font); }
+.hud-btn:hover { background: rgba(255, 255, 255, 0.18); }
+
+/* The notifications' page. */
+.inbox { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.inbox-top { display: flex; align-items: center; gap: 8px; }
+.inbox-top b { font-size: 14px; }
+.inbox-count { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: rgba(255, 255, 255, 0.1); color: var(--dim); margin-right: auto; }
+.inbox-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.15) transparent; }
+.inbox-row { display: flex; gap: 10px; align-items: center; padding: 6px 2px; border-top: 1px solid rgba(255, 255, 255, 0.05); }
+.inbox-badge { flex: 0 0 auto; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; font-weight: 700; font-size: 12px; color: #fff; }
+.inbox-actions { display: flex; gap: 4px; align-items: center; }
+
+/* Downloads in the control center. */
+.ctl-dl { display: flex; flex-direction: column; gap: 5px; }
+.ctl-dl-row { display: flex; gap: 6px; }
+.dl-item { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-size: 11.5px; }
+.dl-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dl-text { color: var(--dim); font-size: 11px; }
+.dl-bar { grid-column: 1 / -1; grid-row: 2; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+.dl-fill { height: 100%; background: #7fd4ff; border-radius: 2px; transition: width 0.3s ease; }
+.dl-item.done .dl-fill { background: #34c759; }
+.dl-fill.indeterminate { animation: slide 1.2s ease-in-out infinite; }
+@keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
