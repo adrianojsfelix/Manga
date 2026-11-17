@@ -33,7 +33,7 @@ export const ITEMS: readonly ItemDef[] = [
 ];
 
 /** The phase this build has reached: items beyond it are not drawn yet. */
-export const BUILT_PHASE = 1;
+export const BUILT_PHASE = 2;
 
 export interface ItemPrefs {
   /** Shown in the small island (at most two). */
@@ -42,7 +42,7 @@ export interface ItemPrefs {
   medium: ItemId[];
 }
 
-export const DEFAULT_ITEMS: ItemPrefs = { small: ["clock"], medium: ["date", "clock"] };
+export const DEFAULT_ITEMS: ItemPrefs = { small: ["clock"], medium: ["date", "clock", "notifications", "battery"] };
 
 const IDS = new Set(ITEMS.map((i) => i.id));
 
@@ -61,13 +61,28 @@ export interface ItemView {
   text: string;
 }
 
+/** What the island knows that some items show. */
+export interface ItemContext {
+  /** 0–1, or null when the PC has no battery (or it is unknown). */
+  battery?: { level: number; charging: boolean } | null;
+  /** Notifications that arrived since the list was last looked at. */
+  unread?: number;
+}
+
 /** What an item shows now, or null when it has nothing (or is not built yet). */
-export function itemView(id: ItemId, now: Date): ItemView | null {
+export function itemView(id: ItemId, now: Date, ctx: ItemContext = {}): ItemView | null {
   switch (id) {
     case "clock":
       return { text: now.toLocaleTimeString(language(), { hour: "2-digit", minute: "2-digit" }) };
     case "date":
       return { text: now.toLocaleDateString(language(), { weekday: "short", day: "numeric", month: "short" }) };
+    case "battery": {
+      const b = ctx.battery;
+      if (!b) return null;
+      return { text: `${b.charging ? "⚡" : ""}${Math.round(b.level * 100)}%` };
+    }
+    case "notifications":
+      return ctx.unread ? { text: `● ${ctx.unread}` } : null;
     default:
       return null;
   }

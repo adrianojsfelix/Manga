@@ -1,6 +1,11 @@
 // Manga: an island at the top of Windows.
 
+mod chat;
 mod island;
+mod notifications;
+mod secrets;
+#[cfg(windows)]
+mod winsqlite;
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
@@ -8,10 +13,20 @@ use tauri::tray::TrayIconBuilder;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![island::island_layout, island::island_focus])
+        .invoke_handler(tauri::generate_handler![
+            island::island_layout,
+            island::island_focus,
+            secrets::secret_set,
+            secrets::secret_has,
+            secrets::secret_clear,
+            chat::chat_send,
+            chat::chat_cancel,
+            notifications::notifications_watch,
+        ])
         .setup(|app| {
             let handle = app.handle().clone();
             island::setup(&handle);
+            notifications::start(handle.clone());
             // The tray: the only way out while the island has no menu of its own.
             let quit = MenuItem::with_id(app, "quit", "Sair do Manga", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&quit])?;

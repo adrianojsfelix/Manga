@@ -6,3 +6,5 @@ license = "MIT"
 description = "Manga's logic that needs neither Windows nor a window: tested on any computer."
 
 [dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
