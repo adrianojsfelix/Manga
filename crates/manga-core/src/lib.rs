@@ -5,3 +5,5 @@ pub mod chat;
 pub mod geometry;
 pub mod notifications;
 pub mod sse;
+pub mod hooks;
+pub mod http;

@@ -21,6 +21,10 @@ export interface Settings {
     /** Seconds a notification stays on the island. */
     seconds: number;
   };
+  claudeCode: {
+    /** Permissions and questions come to the island (off: the terminal, as always). */
+    ask: boolean;
+  };
   island: {
     shape: "notch" | "floating";
     /** The size it rests at. */
@@ -34,6 +38,7 @@ export const DEFAULT_SETTINGS: Settings = {
   provider: "claude",
   ai: { claude: { mode: "key", model: "" }, gemini: { mode: "key", model: "" } },
   notifications: { on: true, ignored: [], seconds: 6 },
+  claudeCode: { ask: true },
   island: { shape: "notch", rest: "small", scale: 1 },
 };
 
@@ -62,6 +67,7 @@ export function sanitizeSettings(raw: unknown): Settings {
       ignored: [...new Set(ignored.map((a) => a.trim()))].slice(0, 100),
       seconds,
     },
+    claudeCode: { ask: typeof obj(r.claudeCode).ask === "boolean" ? (obj(r.claudeCode).ask as boolean) : d.claudeCode.ask },
     island: {
       shape: i.shape === "floating" || i.shape === "notch" ? i.shape : d.island.shape,
       rest: i.rest === "medium" || i.rest === "small" ? i.rest : d.island.rest,

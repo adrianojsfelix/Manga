@@ -9,6 +9,8 @@
 // window through Rust.
 
 import { ChatView } from "../assistant/chat-view.ts";
+import { AskView } from "../claude-code/ask-view.ts";
+import { apply, project, type CcAsk, type CcEvent, type Session } from "../claude-code/sessions.ts";
 import { Bridge, on } from "../core/bridge.ts";
 import { borderRadius, earSize, islandBox, windowSize, type Box } from "../core/geometry.ts";
 import { FOLD_AFTER_MS, INITIAL, next, type IslandEvent, type IslandState, type Page } from "../core/island-state.ts";
@@ -53,6 +55,9 @@ const PAGES: { id: Page; label: string; phase: number }[] = [
 /** The banner's height, unscaled. */
 const NOTICE_HEIGHT = 74;
 const NOTICE_WIDTH = 420;
+/** Claude Code waiting: the panel's width, unscaled. */
+const ASK_WIDTH = 560;
+const HEAD = 36;
 
 interface BatteryManager extends EventTarget {
   level: number;
@@ -93,6 +98,8 @@ export class Island {
   private foldTimer: number | null = null;
   /** What holds the island open: the pin, a text field in use. */
   private holds = new Set<string>();
+  private ask: AskView;
+  private sessions: Session[] = [];
   private shownPage: Page | null = null;
 
   constructor(
@@ -108,7 +115,8 @@ export class Island {
     const hold = (why: string) => (onIt: boolean) => this.hold(why, onIt);
     const change = (p: Partial<Settings>) => this.change(p);
     this.chat = new ChatView(this.kumo, () => this.settings, change, hold("chat"));
-    this.settingsView = new SettingsView(() => this.settings, change, () => this.recent, hold("settings"));
+    this.ask = new AskView(() => this.render(), hold("ask"));
+    this.settingsView = new SettingsView(() => this.settings, change, () => this.recent, () => this.sessions, hold("settings"));
 
     const small = el("div", "small-face");
     small.append(this.eyesBig.el);
@@ -147,7 +155,7 @@ export class Island {
 
     const body = el("div", "body");
     body.append(this.page, this.dock);
-    this.clip.append(small, head, this.banner, body);
+    this.clip.append(small, head, this.banner, body, this.ask.el);
     this.shell.append(this.earL, this.earR, this.clip);
     root.append(this.shell);
 
@@ -171,6 +179,9 @@ export class Island {
     });
 
     on<Notice>("notification", (n) => this.notify(n));
+    on<CcEvent>("cc-event", (e) => this.claudeCode(e));
+    on<CcAsk>("cc-ask", (a) => this.claudeAsks(a));
+    on<number>("cc-ask-gone", (id) => this.ask.gone(id));
     void Bridge.notificationsWatch(settings.notifications.on);
     void this.watchBattery();
 
@@ -206,6 +217,36 @@ export class Island {
     if (this.noticeTimer != null) window.clearTimeout(this.noticeTimer);
     this.noticeTimer = window.setTimeout(() => this.dropNotice(), s.seconds * 1000);
     this.render();
+  }
+
+  /** News from Claude Code (the page's console can call it too). */
+  claudeCode(e: CcEvent) {
+    const before = this.sessions.find((x) => x.id === e.session);
+    this.sessions = apply(this.sessions, e, Date.now());
+    const after = this.sessions.find((x) => x.id === e.session);
+    const name = project(e.cwd);
+    if (e.event === "Notification" && e.message) {
+      this.notify({ id: -Date.now(), app: "Claude Code", title: name, body: e.message, at: Date.now() });
+    } else if (e.event === "Stop" && before?.state === "working") {
+      this.notify({ id: -Date.now(), app: "Claude Code", title: name, body: t("Finished"), at: Date.now() });
+      this.kumo.flash("proud", 2);
+    }
+    const working = this.sessions.some((x) => x.state === "working");
+    if (working && this.kumo.mood === "idle") this.kumo.setMood("working");
+    if (!working && this.kumo.mood === "working" && after?.state !== "working") this.kumo.setMood("idle");
+    if (this.shownPage === "home" || this.shownPage === "settings") this.shownPage = null;
+    this.render();
+  }
+
+  /** Claude Code waits for the user (the page's console can call it too). */
+  claudeAsks(a: CcAsk) {
+    if (!this.settings.claudeCode.ask) {
+      void Bridge.ccAnswer(a.id, { choice: "terminal" });
+      return;
+    }
+    this.claudeCode(a);
+    this.kumo.flash(a.kind === "question" ? "question" : "alert", 2);
+    this.ask.add(a);
   }
 
   private dropNotice() {
@@ -257,6 +298,15 @@ export class Island {
     const s = this.state;
     const i = this.settings.island;
     const box = islandBox(s.size, i.shape, i.scale);
+    if (this.ask.current) {
+      // As wide as it needs, as tall as what it asks.
+      const k = Math.min(1.4, Math.max(0.8, i.scale));
+      const width = Math.max(box.width, Math.round(ASK_WIDTH * k));
+      this.ask.el.style.width = `${width}px`;
+      this.ask.paint();
+      return { ...box, width, height: HEAD + this.ask.el.offsetHeight, radius: Math.round(24 * k) };
+    }
+    this.ask.paint();
     if (!this.notice || s.size === "extended") return box;
     const k = Math.min(1.4, Math.max(0.8, i.scale));
     return { ...box, width: Math.max(box.width, Math.round(NOTICE_WIDTH * k)), height: Math.round(NOTICE_HEIGHT * k), radius: Math.round(22 * k) };
@@ -268,7 +318,8 @@ export class Island {
     const shape = this.settings.island.shape;
     const box = this.box();
     const ear = earSize(box, shape);
-    this.shell.className = `${s.size} ${shape}${look.glow ? " glow" : ""}${this.notice && s.size !== "extended" ? " noticing" : ""}`;
+    const asking = this.ask.current != null;
+    this.shell.className = `${s.size} ${shape}${look.glow ? " glow" : ""}${asking ? " asking" : this.notice && s.size !== "extended" ? " noticing" : ""}`;
     this.shell.style.width = `${box.width}px`;
     this.shell.style.height = `${box.height}px`;
     this.shell.style.borderRadius = borderRadius(box, shape);
@@ -311,6 +362,8 @@ export class Island {
     // The medium island's other items (not the clock and date, already there).
     this.headItems.replaceChildren();
     if (this.state.size !== "small") {
+      const busy = this.sessions.filter((x) => x.state === "working");
+      if (busy.length) this.headItems.append(el("span", "head-item item-cc", busy.length > 1 ? t("{n} sessions", { n: busy.length }) : busy[0].project));
       const ctx: ItemContext = { battery: this.battery, unread: this.unread };
       for (const id of this.items.medium) {
         if (id === "clock" || id === "date") continue;
@@ -339,7 +392,15 @@ export class Island {
       const cards = el("div", "cards");
       const last = this.recent[0];
       cards.append(
-        card("KUMO", t("Hi!"), t("Ask me anything"), "c-kumo", "assistant"),
+        this.sessions.length
+          ? card(
+              "CLAUDE CODE",
+              this.sessions[0].project,
+              this.sessions[0].state === "waiting" ? t("Waiting for you") : this.sessions[0].doing,
+              `c-kumo c-cc ${this.sessions[0].state}`,
+              "settings",
+            )
+          : card("KUMO", t("Hi!"), t("Ask me anything"), "c-kumo", "assistant"),
         card(t("NOW PLAYING"), t("Nothing playing"), t("Phase {n}", { n: 3 }), "c-media"),
         last
           ? card(t("NOTIFICATIONS"), last.title || last.app, last.app, "c-focus c-notice", "settings")

@@ -3,14 +3,15 @@
 // The keys go straight to Windows' Credential Manager; this page only learns
 // whether one is saved.
 
-import { Bridge, IN_APP, type SecretName } from "../core/bridge.ts";
+import { Bridge, IN_APP, type CcStatus, type SecretName } from "../core/bridge.ts";
+import type { Session } from "../claude-code/sessions.ts";
 import { t } from "../core/i18n.ts";
 import type { Provider, Settings } from "../core/settings.ts";
 import { el, typing } from "../island/dom.ts";
 import { ago, type Notice } from "../notify/notices.ts";
 import { language } from "../core/i18n.ts";
 
-type Tab = "assistant" | "notifications" | "island";
+type Tab = "assistant" | "claude" | "notifications" | "island";
 
 const SECRET: Record<Provider, SecretName> = { claude: "anthropic", gemini: "gemini" };
 const AI: { id: Provider; name: string; keyHint: string; model: string; cli: string }[] = [
@@ -27,9 +28,19 @@ export class SettingsView {
     private settings: () => Settings,
     private change: (s: Partial<Settings>) => void,
     private recent: () => readonly Notice[],
+    private sessions: () => readonly Session[],
     private hold: (on: boolean) => void,
   ) {
     void this.checkKeys();
+    void this.checkClaudeCode();
+  }
+
+  private cc: CcStatus | null = null;
+  private ccError = "";
+
+  private async checkClaudeCode() {
+    this.cc = await Bridge.ccStatus();
+    this.paint();
   }
 
   private async checkKeys() {
@@ -39,7 +50,7 @@ export class SettingsView {
 
   paint() {
     const tabs = el("div", "set-tabs");
-    for (const [id, label] of [["assistant", "Assistant"], ["notifications", "Notifications"], ["island", "Island"]] as [Tab, string][]) {
+    for (const [id, label] of [["assistant", "Assistant"], ["claude", "Claude Code"], ["notifications", "Notifications"], ["island", "Island"]] as [Tab, string][]) {
       const b = el("button", `set-tab${this.tab === id ? " on" : ""}`, t(label));
       b.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -50,6 +61,7 @@ export class SettingsView {
     }
     const body = el("div", "set-body");
     if (this.tab === "assistant") this.assistant(body);
+    else if (this.tab === "claude") this.claudeCode(body);
     else if (this.tab === "notifications") this.notifications(body);
     else this.island(body);
     this.el.replaceChildren(tabs, body);
@@ -130,6 +142,49 @@ export class SettingsView {
       }
       body.append(box);
     }
+  }
+
+  private claudeCode(body: HTMLElement) {
+    const s = this.settings();
+    const box = el("div", "set-box");
+    const connected = this.cc?.hooks ?? false;
+    const btn = el("button", `set-btn${connected ? " quiet" : ""}`, connected ? t("Disconnect") : t("Connect"));
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const r = await Bridge.ccConnect(!connected);
+      if ("ok" in r) {
+        this.cc = r.ok;
+        this.ccError = "";
+      } else this.ccError = r.error;
+      this.paint();
+    });
+    box.append(this.row("Claude Code", el("span", `set-state${connected ? " ok" : ""}`, connected ? t("Connected") : t("Not connected")), btn));
+    box.append(
+      this.row(
+        t("Ask on the island"),
+        this.segmented(s.claudeCode.ask ? "on" : "off", [["on", t("On")], ["off", t("Off")]], (v) => this.change({ claudeCode: { ask: v === "on" } })),
+      ),
+    );
+    if (this.ccError) box.append(el("p", "set-note error", this.ccError));
+    if (this.cc && !this.cc.listening) box.append(el("p", "set-note error", t("Manga could not open its port for Claude Code ({port}). Is another Manga open?", { port: 31437 })));
+    box.append(el("p", "set-note", t("Manga adds its hooks to Claude Code's settings ({path}), leaving yours as they are. With Manga closed, Claude Code asks in the terminal as always.", { path: this.cc?.path || "~/.claude/settings.json" })));
+    body.append(box);
+
+    const list = el("div", "set-box");
+    list.append(el("div", "set-title", t("Sessions")));
+    const sessions = this.sessions();
+    if (!sessions.length) list.append(el("p", "set-note", t("No sessions now.")));
+    const now = Date.now();
+    for (const x of sessions) {
+      const item = el("div", "notice-row");
+      const text = el("div", "notice-text");
+      text.append(el("b", "", x.project), el("span", "", x.state === "waiting" ? t("Waiting for you") : x.doing));
+      const meta = el("div", "notice-meta");
+      meta.append(el("span", `cc-dot ${x.state}`), el("span", "", ago(x.at, now, language())));
+      item.append(text, meta);
+      list.append(item);
+    }
+    body.append(list);
   }
 
   private notifications(body: HTMLElement) {

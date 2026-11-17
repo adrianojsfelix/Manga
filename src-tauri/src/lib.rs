@@ -1,6 +1,7 @@
 // Manga: an island at the top of Windows.
 
 mod chat;
+mod claude_code;
 mod island;
 mod notifications;
 mod secrets;
@@ -22,11 +23,15 @@ pub fn run() {
             chat::chat_send,
             chat::chat_cancel,
             notifications::notifications_watch,
+            claude_code::claude_code_answer,
+            claude_code::claude_code_status,
+            claude_code::claude_code_connect,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
             island::setup(&handle);
             notifications::start(handle.clone());
+            claude_code::start(handle.clone());
             // The tray: the only way out while the island has no menu of its own.
             let quit = MenuItem::with_id(app, "quit", "Sair do Manga", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&quit])?;

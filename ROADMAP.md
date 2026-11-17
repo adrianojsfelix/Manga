@@ -22,7 +22,7 @@ Cada fase termina com o app funcionando, testado e checado contra o Windows.
 ## Fase 2 — O assistente e os avisos
 - ✅ **Chat com o Kumo**: Claude e Gemini (chave de API ou a sua assinatura, pelo
   Claude Code e pelo Gemini CLI). O Kumo reage ao que acontece na conversa.
-- **Claude Code**: as sessões do terminal na ilha, pedidos de permissão
+- ✅ **Claude Code**: as sessões do terminal na ilha, pedidos de permissão
   (Permitir / Negar) e as perguntas do Claude respondidas por ela.
 - ✅ **Notificações do Windows**: caem da ilha e ficam numa lista (lidas do banco
   de notificações do Windows); apps ignorados; contador na barra.

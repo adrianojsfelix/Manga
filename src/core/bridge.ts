@@ -42,7 +42,33 @@ export const Bridge = {
   chatSend: (request: ChatRequest) => call<void>("chat_send", { request }),
   chatCancel: (id: string) => call<void>("chat_cancel", { id }),
   notificationsWatch: (on: boolean) => call<void>("notifications_watch", { on }),
+  /** Answers Claude Code waiting on the island. */
+  ccAnswer: (id: number, answer: CcAnswer) => call<boolean>("claude_code_answer", { id, answer }),
+  ccStatus: () => call<CcStatus>("claude_code_status"),
+  /** Adds (or takes out) Manga's hooks in Claude Code's settings.json. */
+  ccConnect: (on: boolean) => invokeOrError<CcStatus>("claude_code_connect", { on }),
 };
+
+export type CcAnswer =
+  | { choice: "allow" | "terminal" }
+  | { choice: "deny"; message?: string }
+  | { choice: "answers"; answers: Record<string, string> };
+
+export interface CcStatus {
+  hooks: boolean;
+  listening: boolean;
+  path: string;
+}
+
+/** Like call(), but the error's text comes back to show it. */
+async function invokeOrError<T>(cmd: string, args?: Record<string, unknown>): Promise<{ ok: T } | { error: string }> {
+  if (!IN_APP) return { error: "Só no app." };
+  try {
+    return { ok: await invoke<T>(cmd, args) };
+  } catch (err) {
+    return { error: String(err) };
+  }
+}
 
 /** Listens to an event from Rust (nothing outside the app). */
 export function on<T>(event: string, handler: (payload: T) => void) {

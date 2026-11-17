@@ -426,3 +426,88 @@ body.browser {
 .notice-text b, .notice-text span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .notice-text span { color: var(--dim); }
 .notice-meta { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-size: 11px; color: var(--dim-2); }
+
+/* Claude Code waiting on the island. */
+.ask {
+  position: absolute;
+  top: 36px;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 2px 18px 14px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+#island.asking .ask { opacity: 1; pointer-events: auto; transition-delay: 0.12s; }
+#island.asking .body,
+#island.asking .banner,
+#island.asking .small-face { opacity: 0; pointer-events: none; }
+#island.asking .head { opacity: 1; }
+.ask-top { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--dim); }
+.ask-badge { padding: 2px 8px; border-radius: 999px; background: #d97757; color: #1b0f0a; font-weight: 600; }
+.ask-step, .ask-header { padding: 1px 7px; border-radius: 6px; background: rgba(255, 255, 255, 0.08); }
+.ask-header { margin-left: auto; }
+.ask-title { font-size: 14px; font-weight: 600; line-height: 1.35; }
+.ask-detail {
+  margin: 0;
+  max-height: 64px;
+  overflow: hidden;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  font: 12px/1.45 "Cascadia Mono", Consolas, ui-monospace, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #e9e3da;
+}
+.ask-row { display: flex; gap: 6px; justify-content: flex-end; align-items: center; }
+.ask-btn { height: 30px; padding: 0 14px; border: 0; border-radius: 9px; font: 600 12.5px var(--font); color: #fff; }
+.ask-btn.allow { background: #2f9e62; }
+.ask-btn.deny { background: #c2414f; }
+.ask-btn.quiet { background: rgba(255, 255, 255, 0.08); color: var(--dim); font-weight: 500; margin-right: auto; }
+.ask-btn.quiet:hover { color: var(--ink); }
+.ask-row .ask-other + .ask-btn.quiet { margin-right: 0; }
+.ask-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.ask-option {
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 7px 10px;
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font: 12.5px var(--font);
+}
+.ask-option span { font-size: 11px; color: var(--dim); }
+.ask-option:hover { border-color: rgba(255, 255, 255, 0.25); }
+.ask-option.on { border-color: #d97757; background: rgba(217, 119, 87, 0.14); }
+.ask-other {
+  flex: 1 1 auto;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--ink);
+  font: 12.5px var(--font);
+  outline: none;
+  user-select: text;
+}
+.ask-other:focus { border-color: rgba(217, 119, 87, 0.8); }
+
+.item-cc { color: #e8a184; }
+.item-cc::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; background: #d97757; vertical-align: 1px; animation: blink 1.1s infinite; }
+.c-cc { background: linear-gradient(170deg, #5a3020, #1d1310); }
+.c-cc .card-big { font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.c-cc .card-small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.set-state { font-size: 12px; color: var(--dim); }
+.set-state.ok { color: #6fd39b; }
+.set-note.error { color: #ff9aa5; }
+.cc-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim-2); }
+.cc-dot.working { background: #d97757; animation: blink 1.1s infinite; }
+.cc-dot.waiting { background: #f5a524; }
+.cc-dot.done { background: #6fd39b; }

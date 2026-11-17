@@ -11,7 +11,9 @@ test("saved settings keep what is valid and fall back on the rest", () => {
     ai: { claude: { mode: "subscription", model: "  claude-x " }, gemini: { mode: "nope" } },
     notifications: { on: false, ignored: ["Teams", "Teams", 3, " "], seconds: 99 },
     island: { shape: "floating", rest: "huge", scale: 3 },
+    claudeCode: { ask: false },
   });
+  assert.equal(s.claudeCode.ask, false);
   assert.deepEqual(s.island, { shape: "floating", rest: "small", scale: 1.4 });
   assert.equal(s.provider, "gemini");
   assert.deepEqual(s.ai.claude, { mode: "subscription", model: "claude-x" });
