@@ -10,8 +10,10 @@ import type { Provider, Settings } from "../core/settings.ts";
 import { el, typing } from "../island/dom.ts";
 import { ago, type Notice } from "../notify/notices.ts";
 import { language } from "../core/i18n.ts";
+import type { AlertMood, AlertPlace, FocusSettings } from "../core/settings.ts";
+import { TONES, playTone } from "../focus/tones.ts";
 
-type Tab = "assistant" | "claude" | "notifications" | "island";
+type Tab = "assistant" | "claude" | "focus" | "notifications" | "island";
 
 const SECRET: Record<Provider, SecretName> = { claude: "anthropic", gemini: "gemini" };
 const AI: { id: Provider; name: string; keyHint: string; model: string; cli: string }[] = [
@@ -50,7 +52,7 @@ export class SettingsView {
 
   paint() {
     const tabs = el("div", "set-tabs");
-    for (const [id, label] of [["assistant", "Assistant"], ["claude", "Claude Code"], ["notifications", "Notifications"], ["island", "Island"]] as [Tab, string][]) {
+    for (const [id, label] of [["assistant", "Assistant"], ["claude", "Claude Code"], ["focus", "Focus"], ["notifications", "Notifications"], ["island", "Island"]] as [Tab, string][]) {
       const b = el("button", `set-tab${this.tab === id ? " on" : ""}`, t(label));
       b.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -62,6 +64,7 @@ export class SettingsView {
     const body = el("div", "set-body");
     if (this.tab === "assistant") this.assistant(body);
     else if (this.tab === "claude") this.claudeCode(body);
+    else if (this.tab === "focus") this.focus(body);
     else if (this.tab === "notifications") this.notifications(body);
     else this.island(body);
     this.el.replaceChildren(tabs, body);
@@ -142,6 +145,106 @@ export class SettingsView {
       }
       body.append(box);
     }
+  }
+
+  private audio: AudioContext | null = null;
+
+  private number(value: number, min: number, max: number, set: (v: number) => void, unit = "min") {
+    const wrap = el("span", "set-num");
+    const input = el("input", "set-input");
+    input.type = "number";
+    input.min = String(min);
+    input.max = String(max);
+    input.value = String(value);
+    typing(input, this.hold);
+    input.addEventListener("change", () => {
+      const v = Math.round(Number(input.value));
+      if (Number.isFinite(v)) set(Math.min(max, Math.max(min, v)));
+    });
+    wrap.append(input, el("span", "set-unit", unit));
+    return wrap;
+  }
+
+  private focus(body: HTMLElement) {
+    const f = this.settings().focus;
+    const setF = (p: Partial<FocusSettings>) => this.change({ focus: { ...f, ...p } });
+    const setP = (p: Partial<FocusSettings["prefs"]>) => setF({ prefs: { ...f.prefs, ...p } });
+    const onOff = (v: boolean, set: (v: boolean) => void) => this.segmented(v ? "on" : "off", [["on", t("On")], ["off", t("Off")]], (x) => set(x === "on"));
+
+    const times = el("div", "set-box");
+    times.append(el("div", "set-title", "Pomodoro"));
+    const grid = el("div", "set-grid");
+    grid.append(
+      this.row(t("Focus"), this.number(f.prefs.focus, 1, 180, (v) => setP({ focus: v }))),
+      this.row(t("Short break"), this.number(f.prefs.short, 1, 60, (v) => setP({ short: v }))),
+      this.row(t("Long break"), this.number(f.prefs.long, 1, 120, (v) => setP({ long: v }))),
+      this.row(t("Rounds before the long break"), this.number(f.prefs.rounds, 1, 12, (v) => setP({ rounds: v }), "")),
+    );
+    times.append(
+      grid,
+      this.row(t("Start breaks by themselves"), onOff(f.prefs.autoBreak, (v) => setP({ autoBreak: v }))),
+      this.row(t("Start focus by itself"), onOff(f.prefs.autoFocus, (v) => setP({ autoFocus: v }))),
+      this.row(t("Rest screen in breaks"), onOff(f.rest, (v) => setF({ rest: v }))),
+      this.row(t("Allow skipping the rest"), onOff(f.restSkip, (v) => setF({ restSkip: v }))),
+      this.row(t("Music only while focusing"), onOff(f.withFocus, (v) => setF({ withFocus: v }))),
+    );
+    body.append(times);
+
+    const sound = el("div", "set-box");
+    sound.append(el("div", "set-title", t("Alarm tone")));
+    const tones = el("div", "set-chips");
+    for (const tn of TONES) {
+      const b = el("button", `chip${f.tone === tn.id ? " on" : ""}`, `▶ ${t(tn.name)}`);
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.audio ??= new AudioContext();
+        void this.audio.resume();
+        playTone(this.audio, tn.id, f.volume);
+        setF({ tone: tn.id });
+        this.paint();
+      });
+      tones.append(b);
+    }
+    const vol = el("input", "set-range");
+    vol.type = "range";
+    vol.min = "0";
+    vol.max = "100";
+    vol.value = String(Math.round(f.volume * 100));
+    vol.addEventListener("change", () => setF({ volume: Number(vol.value) / 100 }));
+    sound.append(tones, this.row(t("Volume"), vol));
+    body.append(sound);
+
+    const card = el("div", "set-box");
+    card.append(el("div", "set-title", t("Alarm card")));
+    const a = f.alert;
+    const setA = (p: Partial<typeof a>) => setF({ alert: { ...a, ...p } });
+    const colors = el("div", "set-chips");
+    for (const c of ["#8b7cf6", "#f4505e", "#f59e0b", "#22c55e", "#0ea5e9", "#ec4899"]) {
+      const sw = el("button", `swatch${a.color === c ? " on" : ""}`);
+      sw.style.background = c;
+      sw.addEventListener("click", (e) => {
+        e.stopPropagation();
+        setA({ color: c });
+        this.paint();
+      });
+      colors.append(sw);
+    }
+    const msg = el("input", "set-input");
+    msg.value = a.message;
+    msg.placeholder = t("A message of your own (optional)");
+    typing(msg, this.hold);
+    msg.addEventListener("change", () => setA({ message: msg.value }));
+    card.append(
+      this.row(t("Where"), this.segmented<AlertPlace>(a.place, [["center", t("Center")], ["top", t("Top")], ["island", t("On the island")]], (place) => setA({ place }))),
+      this.row(
+        t("Kumo's reaction"),
+        this.segmented<AlertMood>(a.mood, [["proud", t("Proud")], ["happy", t("Happy")], ["love", t("Love")], ["surprised", t("Surprised")], ["sleepy", t("Sleepy")]], (mood) => setA({ mood })),
+      ),
+      this.row(t("Colour"), colors),
+      this.row(t("Message"), msg),
+      this.row(t("Ring until dismissed"), onOff(a.repeat, (v) => setA({ repeat: v }))),
+    );
+    body.append(card);
   }
 
   private claudeCode(body: HTMLElement) {

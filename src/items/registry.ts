@@ -33,7 +33,7 @@ export const ITEMS: readonly ItemDef[] = [
 ];
 
 /** The phase this build has reached: items beyond it are not drawn yet. */
-export const BUILT_PHASE = 3;
+export const BUILT_PHASE = 4;
 
 export interface ItemPrefs {
   /** Shown in the small island (at most two). */
@@ -42,7 +42,7 @@ export interface ItemPrefs {
   medium: ItemId[];
 }
 
-export const DEFAULT_ITEMS: ItemPrefs = { small: ["clock"], medium: ["date", "clock", "waves", "notifications", "battery"] };
+export const DEFAULT_ITEMS: ItemPrefs = { small: ["clock"], medium: ["date", "clock", "countdown", "waves", "notifications", "battery"] };
 
 const IDS = new Set(ITEMS.map((i) => i.id));
 

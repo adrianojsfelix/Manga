@@ -14,6 +14,10 @@ test("saved settings keep what is valid and fall back on the rest", () => {
     claudeCode: { ask: false },
   });
   assert.equal(s.claudeCode.ask, false);
+  const f = sanitizeSettings({ focus: { volume: 4, alert: { place: "top", mood: "evil", color: "red" }, prefs: { focus: 50 } } }).focus;
+  assert.equal(f.volume, 1);
+  assert.deepEqual(f.alert, { place: "top", mood: "proud", message: "", color: "#8b7cf6", repeat: true });
+  assert.equal(f.prefs.focus, 50);
   assert.deepEqual(s.island, { shape: "floating", rest: "small", scale: 1.4 });
   assert.equal(s.provider, "gemini");
   assert.deepEqual(s.ai.claude, { mode: "subscription", model: "claude-x" });

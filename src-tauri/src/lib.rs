@@ -8,6 +8,7 @@ mod island;
 mod media;
 mod notifications;
 mod pip;
+mod popup;
 mod radios;
 mod secrets;
 mod system;
@@ -15,6 +16,10 @@ mod system;
 mod winsqlite;
 
 use tauri::menu::{Menu, MenuItem};
+
+/// WebView2's options, the same for every window (it refuses windows that
+/// differ): the island's, from tauri.conf.json, so the focus music can play.
+pub const BROWSER_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --autoplay-policy=no-user-gesture-required";
 use tauri::tray::TrayIconBuilder;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -48,6 +53,8 @@ pub fn run() {
             system::downloads_folder,
             system::app_icon,
             system::download_url,
+            popup::popup_open,
+            popup::popup_close,
         ])
         .setup(|app| {
             let handle = app.handle().clone();

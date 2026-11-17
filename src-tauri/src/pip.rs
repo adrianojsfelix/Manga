@@ -39,6 +39,7 @@ pub fn pip_open(app: AppHandle, source: Option<isize>) -> Result<Source, String>
                 .title("Manga PiP")
                 .inner_size(480.0, 270.0 + BAR)
                 .min_inner_size(240.0, 135.0 + BAR)
+                .additional_browser_args(crate::BROWSER_ARGS)
                 .decorations(false)
                 .always_on_top(true)
                 .skip_taskbar(true)

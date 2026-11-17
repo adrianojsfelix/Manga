@@ -5,18 +5,22 @@ import { Bridge } from "../core/bridge.ts";
 import { language, t } from "../core/i18n.ts";
 import { el, icon } from "../island/dom.ts";
 import { I } from "../island/icons.ts";
+import type { Ring } from "../focus/engine.ts";
 import { lockName, size, type Download, type Locks, type Shot } from "./activity.ts";
 
 export type HudItem =
   | { kind: "lock"; key: keyof Locks; on: boolean }
   | { kind: "shot"; shot: Shot }
-  | { kind: "done"; download: Download; folder: string };
+  | { kind: "done"; download: Download; folder: string }
+  | { kind: "ring"; ring: Ring; color: string; act: (id: string) => void };
 
-const SECONDS: Record<HudItem["kind"], number> = { lock: 1.6, shot: 6, done: 6 };
+const SECONDS: Record<HudItem["kind"], number> = { lock: 1.6, shot: 6, done: 6, ring: 60 };
 
 export class Hud {
   readonly el = el("div", "hud");
   current: HudItem | null = null;
+  /** Kumo's face for a ringing alarm (the island draws it). */
+  ringFace: HTMLElement | null = null;
   private timer: number | null = null;
   private hovering = false;
 
@@ -67,6 +71,26 @@ export class Hud {
       const ic = el("span", `hud-lock${h.on ? " on" : ""}`);
       ic.append(icon(I.lock, 15));
       this.el.append(ic, el("span", "hud-lock-name", lockName(h.key)), el("span", `hud-state${h.on ? " on" : ""}`, h.on ? t("on") : t("off")));
+      return;
+    }
+    if (h.kind === "ring") {
+      const r = h.ring;
+      this.el.style.setProperty("--accent", h.color);
+      const text = el("div", "hud-text");
+      text.append(el("b", "hud-ring-title", r.title), el("span", "", r.body));
+      const row = el("div", "hud-row");
+      r.actions.forEach((a, i) => {
+        const b = el("button", i === 0 ? "hud-btn main" : "hud-btn", a.label);
+        b.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.current = null;
+          h.act(a.id);
+          this.changed();
+        });
+        row.append(b);
+      });
+      text.append(row);
+      this.el.append(this.ringFace ?? el("span"), text);
       return;
     }
     if (h.kind === "shot") {

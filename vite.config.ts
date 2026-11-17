@@ -9,7 +9,7 @@ export default defineConfig({
     target: "chrome110",
     outDir: "dist",
     sourcemap: false,
-    // Two pages: the island and the picture-in-picture window.
-    rollupOptions: { input: { main: "index.html", pip: "pip.html" } },
+    // The pages: the island, picture-in-picture, the alarm's card, the rest screen.
+    rollupOptions: { input: { main: "index.html", pip: "pip.html", alert: "alert.html", rest: "rest.html" } },
   },
 });

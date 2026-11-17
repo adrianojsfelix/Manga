@@ -42,15 +42,18 @@ Cada fase termina com o app funcionando, testado e checado contra o Windows.
   (luz noturna, projetar, energia), recortar só o vídeo no picture-in-picture.
 
 ## Fase 4 — Foco, timer e alarmes (seção especial)
-- **Pomodoro** com tempos e rodadas configuráveis, **timer**, **cronômetro** e
-  **alarmes** (horário, dias da semana, nome).
-- **Janelas de descanso**: na pausa, uma janela pede para levantar, alongar,
-  beber água (pode adiar ou pular).
-- **Música lofi** embutida e **links do YouTube** salvos para tocar ali.
-- **Toques de alarme** à escolha (e arquivos seus); volume próprio.
-- **Janela de notificação do alarme personalizável** (cor, tamanho, posição,
-  texto) com a **reação do Kumo**.
-- **Contador na ilha** do que estiver correndo (Pomodoro, timer ou alarme).
+- ✅ **Pomodoro** com tempos e rodadas configuráveis, **timer** (atalhos e ±1
+  min), **cronômetro** e **alarmes** (horário, dias da semana, nome, soneca).
+- ✅ **Tela de descanso** nas pausas: a tela inteira escurece, o Kumo descansa,
+  dicas (olhar longe, alongar, beber água) e o botão de pular (se permitido).
+- ✅ **Música lofi** gerada na hora (lofi beats, chuva, ruído marrom) e **links do
+  YouTube** salvos (vídeos e playlists); pode tocar só durante o foco.
+- ✅ **Toques de alarme** originais à escolha (sino suave, kalimba, digital,
+  gotas, sinos de vento, pio do Kumo) e volume próprio.
+- ✅ **Janela do alarme personalizável** (centro, topo ou na própria ilha; cor,
+  mensagem, tocar até dispensar) com a **reação do Kumo** à escolha.
+- ✅ **Contador na ilha** do que estiver correndo (na pequena e no topo).
+- Depois: arquivos de som seus como toque, adiar a pausa.
 
 ## Fase 5 — O dia
 - Página **Hoje**: notificações, o que toca, próximo evento, tarefas, água.

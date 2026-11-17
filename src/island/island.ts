@@ -26,6 +26,10 @@ import { InboxView } from "../notify/inbox-view.ts";
 import { remember, shows, type Notice } from "../notify/notices.ts";
 import { lockChange, merge, percent, progressText, type Download, type Locks, type Shot } from "../system/activity.ts";
 import { Hud } from "../system/hud.ts";
+import { FocusEngine, phaseName, type Ring } from "../focus/engine.ts";
+import { FocusView } from "../focus/focus-view.ts";
+import { clock as focusClock, shown as focusShown } from "../focus/timer.ts";
+import { playTone } from "../focus/tones.ts";
 import { I } from "./icons.ts";
 import { SettingsView } from "../settings/settings-view.ts";
 import { Canvas, el, icon } from "./dom.ts";
@@ -104,6 +108,13 @@ export class Island {
   private capsSmall = el("span", "caps-small", "A");
   private ring = el("span", "dl-ring");
   private smallFace = el("div", "small-face");
+  readonly focus: FocusEngine;
+  private focusView: FocusView;
+  private countdown = el("span", "countdown");
+  private ringFace = new Canvas(64, 64, "hud-kumo", (x) => this.kumo.draw(x, 64, 64, 40));
+  private audio: AudioContext | null = null;
+  private ringing: number | null = null;
+  private restShown = 0;
   private recent: Notice[] = [];
   private unread = 0;
   private battery: ItemContext["battery"] = null;
@@ -150,6 +161,34 @@ export class Island {
       hold("controls"),
     );
     this.settingsView = new SettingsView(() => this.settings, change, () => this.recent, () => this.sessions, hold("settings"));
+    this.focus = new FocusEngine(
+      () => this.settings.focus,
+      (r) => this.ringAlarm(r),
+      (open, phase, endsAt) => this.rest(open, phase === "long", endsAt),
+      root,
+    );
+    this.focusView = new FocusView(
+      this.focus,
+      () => this.settings.focus.musicVolume,
+      (v) => {
+        this.focus.setMusicVolume(v);
+        this.change({ focus: { ...this.settings.focus, musicVolume: v } });
+      },
+      hold("focus"),
+    );
+    this.focus.onChange(() => {
+      if (this.shownPage === "home") this.shownPage = null;
+      this.render();
+    });
+    this.hud.ringFace = this.ringFace.el;
+    on<{ action: string }>("alert-action", (a) => {
+      this.stopRinging();
+      this.focus.act(a.action);
+    });
+    on<{ action: string }>("rest-action", () => {
+      this.restShown = 0;
+      this.focus.skip();
+    });
     this.banner = new Banner(
       this.kumo,
       () => this.settings.notifications.seconds,
@@ -178,7 +217,7 @@ export class Island {
     });
 
     const small = this.smallFace;
-    small.append(this.miniCover, this.capsSmall, this.eyesBig.el, this.countBadge, this.wavesSmall.el, this.ring);
+    small.append(this.miniCover, this.capsSmall, this.eyesBig.el, this.countBadge, this.wavesSmall.el, this.countdown, this.ring);
 
     const head = el("div", "head");
     const center = el("span", "head-center");
@@ -314,6 +353,53 @@ export class Island {
     }
     if (this.shownPage === "controls") this.controlsView.setDownloads(this.downloads);
     this.render();
+  }
+
+  /** A focus phase, a timer or an alarm ended: the card, the tone, Kumo. */
+  private ringAlarm(r: Ring) {
+    const f = this.settings.focus;
+    this.kumo.flash(f.alert.mood, 4);
+    const data = { ...r, volume: f.volume, mood: f.alert.mood, color: f.alert.color, repeat: f.alert.repeat };
+    if (IN_APP && f.alert.place !== "island") {
+      void Bridge.popupOpen("alert", data, 460, 220, f.alert.place === "top" ? "top" : "center");
+      return;
+    }
+    // On the island itself: the card in the notch, the tone from here.
+    this.stopRinging();
+    const play = () => {
+      this.audio ??= new AudioContext();
+      void this.audio.resume();
+      playTone(this.audio, r.tone, f.volume);
+    };
+    play();
+    let rings = 1;
+    if (f.alert.repeat) this.ringing = window.setInterval(() => (++rings > 20 ? this.stopRinging() : play()), 3200);
+    this.hud.show({
+      kind: "ring",
+      ring: r,
+      color: f.alert.color,
+      act: (id) => {
+        this.stopRinging();
+        this.focus.act(id);
+      },
+    });
+  }
+
+  private stopRinging() {
+    if (this.ringing != null) window.clearInterval(this.ringing);
+    this.ringing = null;
+  }
+
+  /** The rest screen while a break runs. */
+  private rest(open: boolean, long: boolean, endsAt: number) {
+    if (!IN_APP) return;
+    if (open && this.restShown !== endsAt) {
+      this.restShown = endsAt;
+      void Bridge.popupOpen("rest", { endsAt, long, skip: this.settings.focus.restSkip }, 0, 0, "full");
+    } else if (!open && this.restShown) {
+      this.restShown = 0;
+      void Bridge.popupClose("rest");
+    }
   }
 
   /** The download the island shows: the newest still going, or one just done. */
@@ -464,6 +550,7 @@ export class Island {
     this.settings = { ...before, ...p };
     this.save(this.settings);
     if (p.notifications && p.notifications.on !== before.notifications.on) void Bridge.notificationsWatch(p.notifications.on);
+    if (p.focus) this.focus.prefsChanged();
     if (p.island) {
       if (p.island.rest !== before.island.rest) this.dispatch({ type: "rest", size: p.island.rest });
       this.render();
@@ -503,6 +590,12 @@ export class Island {
     this.ask.paint();
     const k = Math.min(1.4, Math.max(0.8, i.scale));
     this.hud.paint();
+    if (this.hud.current?.kind === "ring") {
+      // A ringing alarm shows even on an open island.
+      const width = Math.max(box.width, Math.round(NOTICE_WIDTH * k));
+      this.hud.el.style.width = `${width}px`;
+      return { ...box, width, height: Math.max(this.hud.el.offsetHeight, 96), radius: Math.round(24 * k) };
+    }
     if (this.hud.current && s.size !== "extended") {
       if (this.hud.current.kind === "lock") {
         return { ...box, width: Math.max(box.width, Math.round(280 * k)), height: Math.max(box.height, Math.round(36 * k)) };
@@ -525,7 +618,7 @@ export class Island {
     const asking = this.ask.current != null;
     const overlay = asking
       ? " asking"
-      : this.hud.current && s.size !== "extended"
+      : this.hud.current && (s.size !== "extended" || this.hud.current.kind === "ring")
         ? ` hudding hud-${this.hud.current.kind}`
         : this.banner.current && s.size !== "extended"
           ? " noticing"
@@ -540,7 +633,10 @@ export class Island {
     this.shell.style.setProperty("--tint", tint ?? "none");
     const showsMedia = !!this.media?.playing && s.size === "small";
     const dl = this.shownDownload();
-    this.shell.classList.toggle("playing", showsMedia && !dl);
+    const counting = this.focus.state.running;
+    this.shell.classList.toggle("playing", showsMedia && !dl && !counting);
+    this.shell.classList.toggle("counting", counting && !dl);
+    this.countdown.className = `countdown ph-${this.focus.state.phase}`;
     this.shell.classList.toggle("downloading", !!dl);
     this.shell.classList.toggle("caps", this.locks.caps);
     this.shell.classList.toggle("unread", this.unread > 0);
@@ -573,7 +669,7 @@ export class Island {
     this.headRight.textContent = now.toLocaleTimeString(language(), { hour: "2-digit", minute: "2-digit" });
     // The medium island's other items (not the clock and date, already there).
     this.headItems.replaceChildren();
-    if (this.state.size === "small") this.smallFace.append(this.ring);
+    if (this.state.size === "small") this.smallFace.append(this.countdown, this.ring);
     if (this.state.size !== "small") {
       if (this.locks.caps) this.headItems.append(el("span", "head-item item-caps", "CAPS"));
       if (this.shownDownload()) this.headItems.append(this.ring);
@@ -586,6 +682,10 @@ export class Island {
           this.bell.classList.toggle("has", this.unread > 0);
           this.bell.dataset.count = this.unread > 99 ? "99+" : String(this.unread);
           this.headItems.append(this.bell);
+          continue;
+        }
+        if (id === "countdown") {
+          if (this.focus.state.running) this.headItems.append(this.countdown);
           continue;
         }
         if (id === "waves") {
@@ -629,7 +729,7 @@ export class Island {
         this.mediaCard(card),
         last
           ? card(t("NOTIFICATIONS"), last.title || last.app, last.app, "c-focus c-notice", "inbox")
-          : card(t("FOCUS"), "25:00", t("Ready"), "c-focus"),
+          : this.focusCard(card),
       );
       this.page.append(cards);
       return;
@@ -638,6 +738,11 @@ export class Island {
       this.chat.paint();
       this.page.append(this.chat.el);
       this.chat.focus();
+      return;
+    }
+    if (page.id === "focus") {
+      this.focusView.paint();
+      this.page.append(this.focusView.el);
       return;
     }
     if (page.id === "inbox") {
@@ -668,6 +773,13 @@ export class Island {
     this.page.append(wrap);
   }
 
+  private focusCard(card: (label: string, big: string, small: string, cls: string, go?: Page) => HTMLElement) {
+    const s = this.focus.state;
+    const c = card(phaseName(s.phase).toUpperCase(), focusClock(focusShown(s, Date.now())), s.running ? t("Running") : t("Ready"), `c-focus ph-${s.phase}`, "focus");
+    c.querySelector(".card-big")!.classList.add("live-count");
+    return c;
+  }
+
   private mediaCard(card: (label: string, big: string, small: string, cls: string, go?: Page) => HTMLElement) {
     const m = this.media;
     if (!m) return card(t("NOW PLAYING"), t("Nothing playing"), t("Any app"), "c-media", "media");
@@ -688,6 +800,15 @@ export class Island {
         if (this.media?.playing) this.wavesHead.draw();
       }
       if (this.state.size === "extended" && this.state.page === "media") this.mediaView.frame();
+      if (this.state.size === "extended" && this.state.page === "focus") this.focusView.frame();
+      if (this.hud.current?.kind === "ring") this.ringFace.draw();
+      const fs = this.focus.state;
+      if (fs.running) {
+        const txt = focusClock(focusShown(fs, Date.now()));
+        if (this.countdown.textContent !== txt) this.countdown.textContent = txt;
+        const live = this.page.querySelector(".live-count");
+        if (live && live.textContent !== txt) live.textContent = txt;
+      }
       if (this.state.size === "extended" && this.state.page === "assistant") this.chat.frame();
       const m = new Date().getMinutes();
       if (m !== this.lastMinute) {

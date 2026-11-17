@@ -735,3 +735,100 @@ body.browser {
 .dl-item.done .dl-fill { background: #34c759; }
 .dl-fill.indeterminate { animation: slide 1.2s ease-in-out infinite; }
 @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+
+/* Focus. */
+.focus { flex: 1 1 auto; min-width: 0; display: flex; gap: 14px; }
+.f-left { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.f-tabs { display: flex; gap: 4px; }
+.f-tab { border: 0; background: transparent; color: var(--dim); font: 12.5px var(--font); padding: 4px 10px; border-radius: 8px; }
+.f-tab:hover { color: var(--ink); }
+.f-tab.on { background: rgba(255, 255, 255, 0.1); color: var(--ink); }
+.f-phase { display: flex; align-items: center; gap: 7px; margin-top: 6px; font-size: 12px; color: var(--dim); }
+.f-dot { width: 8px; height: 8px; border-radius: 50%; background: #f4505e; }
+.f-phase.ph-short .f-dot, .f-phase.ph-long .f-dot { background: #22c55e; }
+.f-phase.ph-timer .f-dot { background: #f59e0b; }
+.f-phase.ph-stopwatch .f-dot { background: #0ea5e9; }
+.f-rounds { display: flex; gap: 4px; margin-left: 4px; }
+.f-rounds i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255, 255, 255, 0.18); }
+.f-rounds i.done { background: #f4505e; }
+.f-time { font: 700 56px/1 "Cascadia Mono", Consolas, ui-monospace, monospace; letter-spacing: 0.01em; font-variant-numeric: tabular-nums; }
+.f-ends { font-size: 12px; color: var(--dim); min-height: 15px; }
+.f-bar { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.1); overflow: hidden; margin: 4px 0 6px; }
+.f-fill { height: 100%; background: #f4505e; border-radius: 2px; }
+.f-bar.ph-short .f-fill, .f-bar.ph-long .f-fill { background: #22c55e; }
+.f-bar.ph-timer .f-fill { background: #f59e0b; }
+.f-row { display: flex; align-items: center; gap: 6px; }
+.f-btn { width: 34px; height: 34px; display: grid; place-items: center; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.08); color: var(--ink); }
+.f-btn:hover { background: rgba(255, 255, 255, 0.16); }
+.f-btn.main { width: 42px; height: 42px; background: #fff; color: #000; }
+.f-btn.main svg path { fill: currentColor; }
+.f-btn.small { width: 26px; height: 26px; background: transparent; color: var(--dim); }
+.f-btn.small:hover { color: var(--ink); background: rgba(255, 255, 255, 0.08); }
+.f-presets { display: flex; align-items: center; gap: 3px; margin-left: 8px; flex-wrap: wrap; }
+.f-presets .chip { padding: 2px 8px; }
+.f-alarms { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; margin-top: 4px; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.15) transparent; }
+.f-alarm { display: flex; align-items: center; gap: 8px; padding: 3px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.f-alarm.off { opacity: 0.5; }
+.f-alarm-text { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
+.f-alarm-text b { font: 700 20px "Cascadia Mono", Consolas, monospace; }
+.f-alarm-text span { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.f-alarm-add { display: flex; align-items: center; gap: 6px; padding-top: 4px; }
+.f-alarm-time { flex: 0 0 92px; }
+.f-days { display: flex; gap: 2px; }
+.f-day { width: 20px; height: 22px; border: 0; border-radius: 6px; background: rgba(255, 255, 255, 0.06); color: var(--dim); font: 600 10.5px var(--font); padding: 0; }
+.f-day.on { background: #e9e4f5; color: #17131f; }
+.switch { position: relative; width: 34px; height: 20px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, 0.16); padding: 0; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform 0.2s ease; }
+.switch.on { background: #22c55e; }
+.switch.on::after { transform: translateX(14px); }
+.f-music {
+  flex: 0 0 236px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+.f-music-head { display: flex; align-items: center; justify-content: space-between; min-height: 22px; }
+.f-stations { display: flex; flex-wrap: wrap; gap: 4px; }
+.f-links { display: flex; flex-direction: column; }
+.f-link { display: flex; align-items: center; gap: 4px; font-size: 12px; }
+.f-link.on .f-link-name { color: #ffd9b3; }
+.f-link-name { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--dim); }
+.f-link-add { display: flex; gap: 4px; }
+.f-link-add .set-btn { padding: 0 8px; display: grid; place-items: center; }
+.set-input.bad { border-color: #f4505e; }
+.f-vol-row { display: flex; align-items: center; gap: 8px; color: var(--dim); margin-top: auto; }
+.f-vol { flex: 1 1 auto; accent-color: #fff; }
+.yt-player { position: fixed; left: -400px; top: 0; width: 200px; height: 120px; border: 0; opacity: 0; pointer-events: none; }
+
+/* The countdown on the island while it runs. */
+.countdown { font: 600 12px "Cascadia Mono", Consolas, ui-monospace, monospace; color: #ff8a8a; letter-spacing: 0.02em; }
+.countdown.ph-short, .countdown.ph-long { color: #6fd39b; }
+.countdown.ph-timer { color: #fbbf24; }
+.countdown.ph-stopwatch { color: #7fd4ff; }
+.small-face .countdown { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); opacity: 0; transition: opacity 0.2s ease; }
+#island.counting .small-face .countdown { opacity: 1; }
+#island.counting .mini-waves { opacity: 0; }
+.c-focus.ph-short, .c-focus.ph-long { background: linear-gradient(170deg, #14532d, #0a2416); }
+.c-focus.ph-timer { background: linear-gradient(170deg, #78350f, #2a1405); }
+.c-focus.ph-stopwatch { background: linear-gradient(170deg, #0c4a6e, #061f30); }
+
+/* An alarm ringing on the island itself. */
+.hud.ring { padding: 12px 18px 14px 10px; }
+.hud-kumo { flex: 0 0 auto; animation: hop 0.8s ease infinite; }
+.hud-ring-title { font-size: 16px !important; }
+.hud-btn.main { background: var(--accent, #8b7cf6); color: #fff; }
+
+/* Settings for focus. */
+.set-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.set-grid .set-label { flex-basis: 110px; }
+.set-num { display: inline-flex; align-items: center; gap: 4px; }
+.set-num .set-input { width: 64px; flex: 0 0 64px; }
+.set-unit { font-size: 11.5px; color: var(--dim-2); }
+.swatch { width: 22px; height: 22px; border-radius: 50%; border: 2px solid transparent; padding: 0; }
+.swatch.on { border-color: #fff; }

@@ -68,6 +68,10 @@ export const Bridge = {
   appIcon: (aumid: string) => call<string | null>("app_icon", { aumid }),
   /** Downloads a link to the Downloads folder (progress: "download" events). */
   downloadUrl: (url: string) => invokeOrError<string>("download_url", { url }),
+  /** The alarm's card or the rest screen, in their own window. */
+  popupOpen: (label: "alert" | "rest", data: unknown, width: number, height: number, place: "center" | "top" | "full") =>
+    call<void>("popup_open", { label, page: `${label}.html`, data, width, height, place }),
+  popupClose: (label: "alert" | "rest") => call<void>("popup_close", { label }),
 };
 
 export interface Sound {

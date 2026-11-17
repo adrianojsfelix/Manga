@@ -4,7 +4,9 @@
   "description": "What Manga's pages (the island, the picture-in-picture) may do.",
   "windows": [
     "island",
-    "pip"
+    "pip",
+    "alert",
+    "rest"
   ],
   "permissions": [
     "core:default",
