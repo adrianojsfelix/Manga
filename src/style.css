@@ -1,0 +1,172 @@
+/* Manga — the island. Dark, rounded, quiet; colours come from the look
+   settings through the custom properties on #island. */
+:root {
+  color-scheme: dark;
+  --font: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --ink: #f5f3fa;
+  --dim: #a7a2b8;
+  --dim-2: #77728a;
+  --card: rgba(255, 255, 255, 0.06);
+  --accent: #8b7cf6;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  font-family: var(--font);
+  color: var(--ink);
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* In a plain browser (npm run dev) a desk to see the island against. */
+body.browser {
+  background: linear-gradient(160deg, #2b3550, #1a2033);
+}
+
+#island-root {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+#island {
+  --bg: #000;
+  position: relative;
+  background: var(--bg);
+  overflow: hidden;
+  transition: width 0.32s cubic-bezier(0.2, 0.9, 0.25, 1.15), height 0.32s cubic-bezier(0.2, 0.9, 0.25, 1.15),
+    border-radius 0.32s ease, margin-top 0.2s ease;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+
+#island.glow {
+  box-shadow: 0 6px 22px rgba(124, 58, 237, 0.45), inset 0 -2px 0 rgba(96, 165, 250, 0.85);
+}
+
+.bar {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px 0 6px;
+  transition: opacity 0.2s ease;
+}
+
+.bar .kumo {
+  flex: 0 0 auto;
+}
+
+.bar .items {
+  flex: 1 1 auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.bar .item.dim {
+  color: var(--dim);
+  font-weight: 500;
+}
+
+.open {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 14px 14px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+
+#island.extended .open {
+  opacity: 1;
+  pointer-events: auto;
+  transition-delay: 0.12s;
+}
+
+#island.extended .bar {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tab {
+  border: 0;
+  background: transparent;
+  color: var(--dim);
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 10px;
+}
+
+.tab:hover { background: rgba(255, 255, 255, 0.07); color: var(--ink); }
+.tab.on { background: rgba(255, 255, 255, 0.12); color: var(--ink); }
+
+.tabs .grow { flex: 1 1 auto; }
+
+.icon-btn {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--dim);
+  font-size: 14px;
+}
+
+.icon-btn:hover { background: rgba(255, 255, 255, 0.08); color: var(--ink); }
+.icon-btn.on { color: var(--accent); }
+
+.page {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+}
+
+.page .kumo-big {
+  flex: 0 0 auto;
+}
+
+.page .content {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+.page h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.page p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--dim);
+}

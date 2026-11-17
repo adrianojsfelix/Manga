@@ -1,0 +1,8 @@
+[package]
+name = "manga-core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Manga's logic that needs neither Windows nor a window: tested on any computer."
+
+[dependencies]

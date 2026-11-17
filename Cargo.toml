@@ -1,0 +1,3 @@
+[workspace]
+members = ["src-tauri", "crates/manga-core"]
+resolver = "2"
