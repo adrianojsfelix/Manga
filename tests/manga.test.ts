@@ -72,3 +72,16 @@ test("Manga's moods and remarks", () => {
   assert.equal(remark("working", "sleepy"), null);
   assert.equal(remark("idle", "idle"), null);
 });
+
+test("Windows' voices are chosen by the gender they declare", async () => {
+  const { chooseVoice } = await import("../src/voice/speech.ts");
+  const voices = [
+    { id: "a", name: "Microsoft Zira", lang: "en-US", gender: "female" as const },
+    { id: "b", name: "Microsoft Maria", lang: "pt-BR", gender: "female" as const },
+    { id: "c", name: "Microsoft Daniel", lang: "pt-BR", gender: "male" as const },
+  ];
+  assert.equal(chooseVoice(voices, "female")?.id, "b");
+  assert.equal(chooseVoice(voices, "male")?.id, "c");
+  assert.equal(chooseVoice([voices[0]], "male")?.id, "a", "any voice rather than silence");
+  assert.equal(chooseVoice([], "male"), null);
+});

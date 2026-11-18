@@ -83,6 +83,9 @@ export const Bridge = {
   pinterestOpen: (path?: string) => invokeOrError<void>("pinterest_open", { path: path ?? null }),
   /** Speech from the voice server on this PC, as a data: URL. */
   voiceSpeak: (base: string, voice: string, model: string, text: string) => invokeOrError<string>("voice_speak", { base, voice, model, text }),
+  /** Windows' installed voices (its own speech engine). */
+  windowsVoices: () => call<WinVoice[]>("windows_voices"),
+  windowsSpeak: (text: string, voice: string, rate: number) => invokeOrError<string>("windows_speak", { text, voice, rate }),
   voiceList: (base: string) => invokeOrError<string[]>("voice_list", { base }),
   fileIcon: (path: string) => call<string | null>("file_icon", { path }),
   keyboardGet: () => call<Keyboard>("keyboard_get"),
@@ -109,6 +112,13 @@ export const Bridge = {
     call<void>("popup_open", { label, page: `${label}.html`, data, width, height, place }),
   popupClose: (label: "alert" | "rest") => call<void>("popup_close", { label }),
 };
+
+export interface WinVoice {
+  id: string;
+  name: string;
+  lang: string;
+  gender: "female" | "male";
+}
 
 export interface Release {
   version: string;

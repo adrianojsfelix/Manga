@@ -85,6 +85,8 @@ pub fn run() {
             popup::pinterest_open,
             voice::voice_speak,
             voice::voice_list,
+            voice::windows_voices,
+            voice::windows_speak,
             sysinfo::sysinfo,
             actions::win_state,
             actions::win_action,

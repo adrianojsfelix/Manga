@@ -16,6 +16,7 @@ import { DOCK_PAGES } from "../core/settings.ts";
 import { geocodeUrl, parsePlaces, type Place } from "../day/weather.ts";
 import { saveProfile, type LookPrefs, type Profile } from "../core/look.ts";
 import { Speaker } from "../voice/speaker.ts";
+import type { Voice } from "../voice/speech.ts";
 import type { Page } from "../core/island-state.ts";
 import { BUILT_PHASE, ITEMS, type ItemId, type ItemPrefs } from "../items/registry.ts";
 
@@ -531,6 +532,8 @@ export class SettingsView {
 
   private studioVoices: string[] = [];
   private voiceNote = "";
+  private voiceOk = false;
+  private winVoices: Voice[] | null = null;
   private studioVoice = el("input", "set-input");
   private studioModel = el("input", "set-input");
   private studioUrl = el("input", "set-input");
@@ -543,7 +546,13 @@ export class SettingsView {
     const test = el("button", "set-btn", t("Hear it"));
     test.addEventListener("click", async (e) => {
       e.stopPropagation();
-      this.voiceNote = (await this.speaker?.say(t("Hi! I'm {name}. Shall we focus for a bit?", { name: "Manga" }), true)) ?? "";
+      if (!this.speaker) return;
+      this.voiceNote = t("Speaking…");
+      this.voiceOk = true;
+      this.paint();
+      const err = await this.speaker.say(t("Hi! I'm {name}. Shall we focus for a bit?", { name: "Manga" }), true);
+      this.voiceOk = !err;
+      this.voiceNote = err ?? (v.on ? "" : t("It works! Turn on “Manga speaks” for him to speak by himself."));
       this.paint();
     });
 
@@ -555,14 +564,16 @@ export class SettingsView {
       this.row(t("From"), this.segmented(v.engine, [["windows", t("Windows' voices")], ["studio", "Voice Studio"]], (engine) => setV({ engine }))),
     );
     if (v.engine === "windows") {
-      const voices = Speaker.voices();
+      if (!this.winVoices) void Speaker.voices(true).then((l) => ((this.winVoices = l), this.paint()));
+      const voices = this.winVoices ?? [];
       const pick = el("select", "set-input");
       pick.append(new Option(t("The best for the choice above"), ""));
-      for (const x of voices) pick.append(new Option(`${x.name} (${x.lang})`, x.name));
+      for (const x of voices) pick.append(new Option(`${x.name} (${x.lang}${x.gender ? ` · ${x.gender === "female" ? t("Female") : t("Male")}` : ""})`, x.id));
       pick.value = v.windowsVoice;
       pick.addEventListener("change", () => setV({ windowsVoice: pick.value }));
       box.append(this.row(t("Windows voice"), pick));
-      if (!voices.length) box.append(el("p", "set-note", t("No Windows voices found. Add Portuguese voices in Windows Settings → Time & language → Speech.")));
+      if (this.winVoices && !voices.length) box.append(el("p", "set-note", t("No Windows voices found. Add Portuguese voices in Windows Settings → Time & language → Speech.")));
+      else if (voices.length && !voices.some((x) => x.lang.startsWith("pt"))) box.append(el("p", "set-note", t("No Portuguese voice yet: add “Português (Brasil)” in Windows Settings → Time & language → Speech → Add voices.")));
     } else {
       this.studioUrl.value = v.studioUrl;
       this.studioUrl.placeholder = "http://127.0.0.1:3900";
@@ -609,7 +620,7 @@ export class SettingsView {
     rate.value = String(v.rate);
     rate.addEventListener("change", () => setV({ rate: Number(rate.value) }));
     box.append(this.row(t("Speed"), rate), this.row("", test));
-    if (this.voiceNote) box.append(el("p", "set-note error", this.voiceNote));
+    if (this.voiceNote) box.append(el("p", `set-note ${this.voiceOk ? "ok" : "error"}`, this.voiceNote));
     body.append(box);
 
     const what = el("div", "set-box");

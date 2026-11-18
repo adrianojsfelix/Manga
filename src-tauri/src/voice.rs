@@ -69,3 +69,87 @@ pub async fn voice_list(base: String) -> Result<Vec<String>, String> {
     }
     Err("Não consegui a lista de vozes; escreva o nome da voz.".into())
 }
+
+#[derive(serde::Serialize)]
+pub struct WinVoice {
+    pub id: String,
+    pub name: String,
+    pub lang: String,
+    /// "female" | "male".
+    pub gender: String,
+}
+
+/// The voices installed in Windows (Settings → Time & language → Speech).
+#[tauri::command]
+pub async fn windows_voices() -> Vec<WinVoice> {
+    tauri::async_runtime::spawn_blocking(win::voices).await.unwrap_or_default()
+}
+
+/// Speech from one of Windows' voices, as a data: URL (a WAV) to play.
+#[tauri::command]
+pub async fn windows_speak(text: String, voice: String, rate: f64) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || win::speak(&text, &voice, rate)).await.map_err(|e| e.to_string())?
+}
+
+#[cfg(not(windows))]
+mod win {
+    pub fn voices() -> Vec<super::WinVoice> {
+        vec![]
+    }
+    pub fn speak(_: &str, _: &str, _: f64) -> Result<String, String> {
+        Err("Só no Windows.".into())
+    }
+}
+
+#[cfg(windows)]
+mod win {
+    use super::WinVoice;
+    use windows::core::HSTRING;
+    use windows::Media::SpeechSynthesis::{SpeechSynthesizer, VoiceGender};
+    use windows::Storage::Streams::DataReader;
+    use windows::Win32::System::Com::{CoInitializeEx, COINIT_MULTITHREADED};
+
+    fn init() {
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        }
+    }
+
+    pub fn voices() -> Vec<WinVoice> {
+        init();
+        let Ok(all) = SpeechSynthesizer::AllVoices() else { return vec![] };
+        all.into_iter()
+            .filter_map(|v| {
+                Some(WinVoice {
+                    id: v.Id().ok()?.to_string(),
+                    name: v.DisplayName().ok()?.to_string(),
+                    lang: v.Language().ok()?.to_string(),
+                    gender: if v.Gender().ok()? == VoiceGender::Male { "male" } else { "female" }.into(),
+                })
+            })
+            .collect()
+    }
+
+    pub fn speak(text: &str, voice: &str, rate: f64) -> Result<String, String> {
+        init();
+        let fail = |e: windows::core::Error| format!("A voz do Windows falhou: {}", e.message());
+        let synth = SpeechSynthesizer::new().map_err(fail)?;
+        if !voice.is_empty() {
+            if let Ok(all) = SpeechSynthesizer::AllVoices() {
+                if let Some(v) = all.into_iter().find(|v| v.Id().map(|id| id.to_string() == voice).unwrap_or(false)) {
+                    synth.SetVoice(&v).map_err(fail)?;
+                }
+            }
+        }
+        if let Ok(o) = synth.Options() {
+            let _ = o.SetSpeakingRate(rate.clamp(0.5, 2.0));
+        }
+        let stream = synth.SynthesizeTextToStreamAsync(&HSTRING::from(text)).map_err(fail)?.get().map_err(fail)?;
+        let size = stream.Size().map_err(fail)? as u32;
+        let reader = DataReader::CreateDataReader(&stream.GetInputStreamAt(0).map_err(fail)?).map_err(fail)?;
+        reader.LoadAsync(size).map_err(fail)?.get().map_err(fail)?;
+        let mut buf = vec![0u8; size as usize];
+        reader.ReadBytes(&mut buf).map_err(fail)?;
+        Ok(format!("data:audio/wav;base64,{}", manga_core::media::base64(&buf)))
+    }
+}

@@ -32,6 +32,8 @@ windows = { version = "0.61", features = [
   "Foundation_Collections",
   "Media",
   "Media_Control",
+  "Media_SpeechSynthesis",
+  "Media_Core",
   "Storage_Streams",
   "Devices_Radios",
   "Win32_Foundation",

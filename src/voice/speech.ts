@@ -49,3 +49,26 @@ export function pickVoice<T extends VoiceInfo>(voices: readonly T[], gender: "fe
   const best = [...voices].sort((a, b) => score(b) - score(a))[0];
   return best && score(best) >= 3 ? best : null;
 }
+
+export interface Voice {
+  id: string;
+  name: string;
+  lang: string;
+  gender: "female" | "male" | null;
+}
+
+/** Among voices that know their gender: the user's language, the gender asked, natural ones first. */
+export function chooseVoice(voices: readonly Voice[], gender: "female" | "male", lang = "pt-BR"): Voice | null {
+  const base = lang.split("-")[0].toLowerCase();
+  const score = (v: Voice) => {
+    let s = 0;
+    const l = v.lang.toLowerCase();
+    if (l === lang.toLowerCase()) s += 4;
+    else if (l.startsWith(base)) s += 2;
+    if ((v.gender ?? genderOf(v.name)) === gender) s += 3;
+    if (/natural|online/i.test(v.name)) s += 1;
+    return s;
+  };
+  const best = [...voices].sort((a, b) => score(b) - score(a))[0];
+  return best ?? null;
+}
