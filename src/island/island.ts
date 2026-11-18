@@ -13,7 +13,7 @@
 import { ChatView } from "../assistant/chat-view.ts";
 import { AskView } from "../claude-code/ask-view.ts";
 import { ControlsView } from "../controls/controls-view.ts";
-import { bars, positionNow, subtitle, tintOf, type Media } from "../media/media.ts";
+import { bars, positionNow, subtitle, type Media } from "../media/media.ts";
 import { MediaView } from "../media/media-view.ts";
 import { apply, project, type CcAsk, type CcEvent, type Session } from "../claude-code/sessions.ts";
 import { Bridge, IN_APP, on } from "../core/bridge.ts";
@@ -205,7 +205,6 @@ export class Island {
   private media: Media | null = null;
   private mediaReadAt = 0;
   private level = 0;
-  private coverTint: { cover: string; tint: string | null } = { cover: "", tint: null };
   private mediaView: MediaView;
   private controlsView: ControlsView;
   private miniCover = el("span", "mini-cover");
@@ -736,7 +735,6 @@ export class Island {
     const before = this.media;
     this.media = m && m.title ? m : null;
     this.mediaReadAt = Date.now();
-    if (this.media?.cover !== before?.cover) void this.readTint();
     const same = before && this.media && before.title === this.media.title && before.playing === this.media.playing && before.cover === this.media.cover;
     if (this.shownPage === "media" && !same) this.mediaView.paint();
     if (this.shownPage === "home" && !same) this.shownPage = null;
@@ -764,37 +762,6 @@ export class Island {
       x.roundRect(i * (bw + gap), (h - bh) / 2, bw, bh, bw / 2);
       x.fill();
     });
-  }
-
-  /** The cover's average colour tints the open island, as glass. */
-  private async readTint() {
-    const cover = this.media?.cover ?? "";
-    if (!cover) {
-      this.coverTint = { cover: "", tint: null };
-      this.render();
-      return;
-    }
-    const img = new Image();
-    img.src = cover;
-    try {
-      await img.decode();
-      const c = document.createElement("canvas");
-      c.width = c.height = 8;
-      const x = c.getContext("2d")!;
-      x.drawImage(img, 0, 0, 8, 8);
-      const d = x.getImageData(0, 0, 8, 8).data;
-      let r = 0, g = 0, b = 0;
-      for (let i = 0; i < d.length; i += 4) {
-        r += d[i];
-        g += d[i + 1];
-        b += d[i + 2];
-      }
-      const n = d.length / 4;
-      this.coverTint = { cover, tint: tintOf(r / n, g / n, b / n) };
-    } catch {
-      this.coverTint = { cover, tint: null };
-    }
-    this.render();
   }
 
   /** News from Claude Code (the page's console can call it too). */
@@ -927,7 +894,8 @@ export class Island {
     this.shell.style.borderRadius = borderRadius(box, shape);
     this.shell.style.marginTop = `${box.gap}px`;
     this.shell.style.setProperty("--bg", look.color !== "#000" ? look.color : background(this.settings.look.color, this.settings.look.glass));
-    const tint = look.tint ?? (s.size === "extended" && this.media ? this.coverTint.tint : null);
+    // The island stays its own colour (black by default) on every page: no tint from the cover.
+    const tint = look.tint;
     this.shell.style.setProperty("--tint", tint ?? "none");
     const showsMedia = !!this.media?.playing && s.size === "small";
     const dl = this.shownDownload();
