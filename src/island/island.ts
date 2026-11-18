@@ -13,7 +13,7 @@
 import { ChatView } from "../assistant/chat-view.ts";
 import { AskView } from "../claude-code/ask-view.ts";
 import { ControlsView } from "../controls/controls-view.ts";
-import { bars, subtitle, tintOf, type Media } from "../media/media.ts";
+import { bars, positionNow, subtitle, tintOf, type Media } from "../media/media.ts";
 import { MediaView } from "../media/media-view.ts";
 import { apply, project, type CcAsk, type CcEvent, type Session } from "../claude-code/sessions.ts";
 import { Bridge, IN_APP, on } from "../core/bridge.ts";
@@ -147,7 +147,6 @@ export class Island {
   private headLeft = el("span", "head-left");
   private headRight = el("span", "head-right");
   private headItems = el("span", "head-items");
-  private eyesSmall = new Canvas(36, 22, "eyes-small", (x) => drawGlowEyes(x, this.kumo, 36, 22, 7));
   private menu = el("button", "head-menu", "···");
   // A notification.
   private banner: Banner;
@@ -165,7 +164,7 @@ export class Island {
   private slotR = el("span", "slot slot-r");
   private smallCenter = el("span", "small-center");
   private headTools = el("span", "head-tools");
-  private homeFace = new Canvas(96, 96, "home-manga", (x) => this.kumo.draw(x, 96, 96, 60));
+  private homeFace = new Canvas(150, 150, "home-manga", (x) => this.kumo.draw(x, 150, 150, 92));
   private sys: ItemContext["sys"] = null;
   private liveOn = false;
   private systemView = new SystemView((s) => {
@@ -260,6 +259,7 @@ export class Island {
         this.change({ focus: { ...this.settings.focus, musicVolume: v } });
       },
       hold("focus"),
+      (p) => this.change({ focus: { ...this.settings.focus, prefs: { ...this.settings.focus.prefs, ...p } } }),
     );
     this.focus.onChange(() => {
       if (this.shownPage === "home") this.shownPage = null;
@@ -390,7 +390,6 @@ export class Island {
 
     const head = el("div", "head");
     const center = el("span", "head-center");
-    center.append(this.eyesSmall.el);
     const right = el("span", "head-right-box");
     right.append(this.headItems, this.headRight, this.menu);
     const left = el("span", "head-left-box");
@@ -1044,24 +1043,7 @@ export class Island {
         }
         return c;
       };
-      const cards = el("div", "cards");
-      const last = this.recent[0];
-      cards.append(
-        this.sessions.length
-          ? card(
-              "CLAUDE CODE",
-              this.sessions[0].project,
-              this.sessions[0].state === "waiting" ? t("Waiting for you") : this.sessions[0].doing,
-              `c-kumo c-cc ${this.sessions[0].state}`,
-              "settings",
-            )
-          : this.mangaCard(card),
-        this.mediaCard(card),
-        last
-          ? card(t("NOTIFICATIONS"), last.title || last.app, last.app, "c-focus c-notice", "inbox")
-          : this.focusCard(card),
-      );
-      this.page.append(cards);
+      this.page.append(this.homeGrid(card));
       return;
     }
     if (page.id === "assistant") {
@@ -1129,27 +1111,95 @@ export class Island {
     this.page.append(wrap);
   }
 
-  /** Manga on the home page: himself, saying hi. */
-  private mangaCard(card: (label: string, big: string, small: string, cls: string, go?: Page) => HTMLElement) {
-    const c = card("MANGA", t("Hi!"), t("Ask me anything"), "c-kumo c-manga", "assistant");
-    c.prepend(this.homeFace.el);
-    return c;
-  }
+  /**
+   * The home page: Manga alone, floating on black (a click talks to him);
+   * what plays with its buttons; focus (timer, alarm, pomodoro); the next events.
+   */
+  private homeGrid(card: (label: string, big: string, small: string, cls: string, go?: Page) => HTMLElement) {
+    const grid = el("div", "home");
+    const go = (e: HTMLElement, page: Page) => {
+      e.classList.add("go");
+      e.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        this.dispatch({ type: "open", page });
+      });
+    };
 
-  private focusCard(card: (label: string, big: string, small: string, cls: string, go?: Page) => HTMLElement) {
-    const s = this.focus.state;
-    const c = card(phaseName(s.phase).toUpperCase(), focusClock(focusShown(s, Date.now())), s.running ? t("Running") : t("Ready"), `c-focus ph-${s.phase}`, "focus");
-    c.querySelector(".card-big")!.classList.add("live-count");
-    return c;
-  }
+    // Manga.
+    const manga = el("div", "h-manga");
+    manga.append(this.homeFace.el);
+    const cc = this.sessions[0];
+    if (cc) manga.append(el("span", "h-cc", `${cc.project} · ${cc.state === "waiting" ? t("Waiting for you") : cc.doing}`));
+    go(manga, cc ? "settings" : "assistant");
+    manga.title = t("Talk to Manga");
 
-  private mediaCard(card: (label: string, big: string, small: string, cls: string, go?: Page) => HTMLElement) {
+    // What plays, with its buttons.
     const m = this.media;
-    if (!m) return card(t("NOW PLAYING"), t("Nothing playing"), t("Any app"), "c-media", "media");
-    const c = card(m.playing ? t("NOW PLAYING") : t("PAUSED"), m.title, subtitle(m), "c-media has-media", "media");
-    if (m.cover) c.style.setProperty("--cover", `url("${m.cover}")`);
-    return c;
+    const player = el("div", `h-player${m?.cover ? " has-cover" : ""}`);
+    if (m?.cover) player.style.setProperty("--cover", `url("${m.cover}")`);
+    const info = el("div", "h-info");
+    info.append(
+      el("span", "card-label", m ? (m.playing ? t("NOW PLAYING") : t("PAUSED")) : t("NOW PLAYING")),
+      el("b", "h-title", m?.title ?? t("Nothing playing")),
+      el("span", "h-sub", m ? subtitle(m) : t("Any app")),
+    );
+    const row = el("div", "h-controls");
+    const btn = (path: string, label: string, act: () => void, cls = "") => {
+      const b = el("button", `h-btn ${cls}`);
+      b.title = label;
+      b.append(icon(path, cls ? 18 : 15));
+      b.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        act();
+      });
+      return b;
+    };
+    if (m) {
+      row.append(
+        btn(I.prev, t("Previous"), () => void Bridge.mediaControl("previous")),
+        btn(m.playing ? I.pause : I.play, m.playing ? t("Pause") : t("Play"), () => void Bridge.mediaControl("play_pause"), "main"),
+        btn(I.next, t("Next"), () => void Bridge.mediaControl("next")),
+      );
+      const bar = el("div", "h-bar");
+      bar.append(el("div", "h-fill live-progress"));
+      info.append(bar);
+    }
+    player.append(info, row);
+    go(player, "media");
+
+    // Focus: the pomodoro, the timer or the next alarm, and its button.
+    const f = this.focus.state;
+    const focus = el("div", `h-focus ph-${f.phase}`);
+    const nextAlarm = this.focus.alarms.filter((a) => a.on).map((a) => a.time).sort()[0];
+    focus.append(
+      el("span", "card-label", phaseName(f.phase).toUpperCase()),
+      el("b", "h-time live-count", focusClock(focusShown(f, Date.now()))),
+      el("span", "h-sub", nextAlarm ? `⏰ ${nextAlarm}` : f.running ? t("Running") : t("Ready")),
+    );
+    focus.append(
+      btn(f.running ? I.pause : I.play, f.running ? t("Pause") : t("Start"), () => this.focus.toggle(), "main focus-go"),
+    );
+    go(focus, "focus");
+
+    // The next events.
+    const events = el("div", "h-events");
+    events.append(el("span", "card-label", t("EVENTS")));
+    const list = this.day.upcoming(3, 3);
+    if (!list.length) events.append(el("span", "h-sub", this.day.events.length ? t("Nothing in the next days.") : t("Add your calendars in Settings → The day.")));
+    for (const o of list) {
+      const r = el("div", "h-event");
+      r.append(el("b", "", o.title || t("(no title)")), el("span", "", when(o)));
+      events.append(r);
+    }
+    go(events, "today");
+
+    void card;
+    grid.append(manga, player, focus, events);
+    return grid;
   }
+
+
+
 
   /** The video, live, in the media page's cover (Windows draws it there). */
   private live() {
@@ -1181,7 +1231,6 @@ export class Island {
         if (this.settings.island.center === "eyes") this.eyesBig.draw();
         if (this.media?.playing) this.wavesSmall.draw();
       } else {
-        this.eyesSmall.draw();
         if (this.media?.playing) this.wavesHead.draw();
       }
       if (this.state.size === "extended" && this.state.page === "media") this.mediaView.frame();
@@ -1195,7 +1244,12 @@ export class Island {
         if (live && live.textContent !== txt) live.textContent = txt;
       }
       if (this.state.size === "extended" && this.state.page === "assistant") this.chat.frame();
-      if (this.state.size === "extended" && this.state.page === "home" && this.homeFace.el.isConnected) this.homeFace.draw();
+      if (this.state.size === "extended" && this.state.page === "home" && this.homeFace.el.isConnected) {
+        this.homeFace.draw();
+        const fill = this.page.querySelector<HTMLElement>(".live-progress");
+        const m = this.media;
+        if (fill && m && m.duration > 0) fill.style.width = `${(positionNow(m, this.mediaReadAt, Date.now()) / m.duration) * 100}%`;
+      }
       this.live();
       const m = new Date().getMinutes();
       if (m !== this.lastMinute) {

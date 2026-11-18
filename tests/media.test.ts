@@ -36,3 +36,13 @@ test("waves stay in bounds and are still when silent", () => {
 test("the tint is a darkened glass of the cover's colour", () => {
   assert.equal(tintOf(200, 100, 0), "linear-gradient(160deg, rgba(110, 55, 0, 0.85), rgba(0, 0, 0, 0) 70%)");
 });
+
+test("the playing app's volume line is found by name", async () => {
+  const { appOf } = await import("../src/media/media.ts");
+  const apps = [{ name: "Chrome" }, { name: "Spotify" }, { name: "Media Player" }];
+  assert.equal(appOf(apps, "Chrome")?.name, "Chrome");
+  assert.equal(appOf(apps, "Spotify Music")?.name, "Spotify");
+  assert.equal(appOf(apps, "MediaPlayer")?.name, "Media Player");
+  assert.equal(appOf(apps, "VLC"), null);
+  assert.equal(appOf(apps, ""), null);
+});

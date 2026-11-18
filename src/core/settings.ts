@@ -65,6 +65,8 @@ export interface Settings {
     feeds: string[];
     /** Pinterest boards ("user/board" or links). */
     pins: string[];
+    /** The pictures' size. */
+    pinSize: "s" | "m" | "l";
   };
 }
 
@@ -141,7 +143,7 @@ export const DEFAULT_SETTINGS: Settings = {
   look: DEFAULT_LOOK,
   updates: true,
   day: { place: null, calendars: [], water: DEFAULT_WATER },
-  tools: { feeds: DEFAULT_FEEDS, pins: [] },
+  tools: { feeds: DEFAULT_FEEDS, pins: [], pinSize: "m" },
 };
 
 
@@ -192,6 +194,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     tools: {
       feeds: strings(obj(r.tools).feeds, d.tools.feeds),
       pins: strings(obj(r.tools).pins, d.tools.pins),
+      pinSize: (["s", "m", "l"] as const).includes(obj(r.tools).pinSize as "s") ? (obj(r.tools).pinSize as "s" | "m" | "l") : d.tools.pinSize,
     },
     island: {
       shape: i.shape === "floating" || i.shape === "notch" ? i.shape : d.island.shape,

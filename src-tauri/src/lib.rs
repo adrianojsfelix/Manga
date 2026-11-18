@@ -81,6 +81,7 @@ pub fn run() {
             system::download_url,
             popup::popup_open,
             popup::popup_close,
+            popup::pinterest_open,
             sysinfo::sysinfo,
             actions::win_state,
             actions::win_action,

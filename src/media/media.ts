@@ -14,6 +14,19 @@ export interface Media {
   cover: string;
   canSeek: boolean;
   canSkip: boolean;
+  /** "none" | "track" | "list" (older builds: missing). */
+  repeat?: "none" | "track" | "list";
+  canRepeat?: boolean;
+}
+
+/** The app's volume line among the sound's apps: by name, one way or the other. */
+export function appOf<T extends { name: string }>(apps: readonly T[], app: string): T | null {
+  const a = app.toLowerCase().replace(/\s+/g, "");
+  if (!a) return null;
+  return apps.find((x) => {
+    const n = x.name.toLowerCase().replace(/\s+/g, "");
+    return n === a || n.includes(a) || a.includes(n);
+  }) ?? null;
 }
 
 /** "3:07", "1:02:45". */

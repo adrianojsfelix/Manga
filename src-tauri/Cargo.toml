@@ -30,6 +30,7 @@ keyring = { version = "3", features = ["windows-native"] }
 windows = { version = "0.61", features = [
   "Foundation",
   "Foundation_Collections",
+  "Media",
   "Media_Control",
   "Storage_Streams",
   "Devices_Radios",

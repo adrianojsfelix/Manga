@@ -19,6 +19,9 @@ pub struct Media {
     pub cover: String,
     pub can_seek: bool,
     pub can_skip: bool,
+    /// "none" | "track" | "list".
+    pub repeat: String,
+    pub can_repeat: bool,
 }
 
 #[tauri::command]
@@ -59,6 +62,7 @@ mod imp {
         GlobalSystemMediaTransportControlsSession as Session, GlobalSystemMediaTransportControlsSessionManager as Manager,
         GlobalSystemMediaTransportControlsSessionPlaybackStatus as Status,
     };
+    use windows::Media::MediaPlaybackAutoRepeatMode as Repeat;
     use windows::Storage::Streams::{DataReader, IRandomAccessStreamReference};
     use windows::Win32::System::Com::{CoInitializeEx, COINIT_MULTITHREADED};
 
@@ -98,6 +102,13 @@ mod imp {
             cover: String::new(),
             can_seek: controls.IsPlaybackPositionEnabled().unwrap_or(false),
             can_skip: controls.IsNextEnabled().unwrap_or(false) || controls.IsPreviousEnabled().unwrap_or(false),
+            repeat: match info.AutoRepeatMode().and_then(|r| r.Value()) {
+                Ok(m) if m == Repeat::Track => "track",
+                Ok(m) if m == Repeat::List => "list",
+                _ => "none",
+            }
+            .to_string(),
+            can_repeat: controls.IsRepeatEnabled().unwrap_or(false),
         };
         // The cover is read again only for another song.
         match prev {
@@ -133,7 +144,7 @@ mod imp {
                 // Position moves every read: it is sent on changes and every few seconds.
                 since_sent += 1;
                 let changed = match (&now, &sent) {
-                    (Some(a), Some(b)) => a.title != b.title || a.playing != b.playing || a.artist != b.artist || a.cover != b.cover || (a.position - b.position).abs() > 3.0 || since_sent >= 5,
+                    (Some(a), Some(b)) => a.title != b.title || a.playing != b.playing || a.repeat != b.repeat || a.artist != b.artist || a.cover != b.cover || (a.position - b.position).abs() > 3.0 || since_sent >= 5,
                     (None, None) => false,
                     _ => true,
                 };
@@ -154,6 +165,12 @@ mod imp {
                 "play_pause" => s.TryTogglePlayPauseAsync()?.get()?,
                 "next" => s.TrySkipNextAsync()?.get()?,
                 "previous" => s.TrySkipPreviousAsync()?.get()?,
+                // Off → the list → this one → off, as the players do.
+                "repeat" => {
+                    let now = s.GetPlaybackInfo()?.AutoRepeatMode().and_then(|r| r.Value()).unwrap_or(Repeat::None);
+                    let next = if now == Repeat::None { Repeat::List } else if now == Repeat::List { Repeat::Track } else { Repeat::None };
+                    s.TryChangeAutoRepeatModeAsync(next)?.get()?
+                }
                 "seek" => {
                     let start = s.GetTimelineProperties()?.StartTime()?.Duration;
                     let at = start + (position.unwrap_or(0.0).max(0.0) * 10_000_000.0) as i64;

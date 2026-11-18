@@ -7,7 +7,7 @@ import { I } from "../island/icons.ts";
 import type { Alarm } from "./alarms.ts";
 import { phaseName, type FocusEngine } from "./engine.ts";
 import { STATIONS } from "./lofi.ts";
-import { clock, progress, shown, type Mode } from "./timer.ts";
+import { clock, progress, shown, type FocusPrefs, type Mode } from "./timer.ts";
 
 type Tab = Mode | "alarms";
 
@@ -33,6 +33,7 @@ export class FocusView {
     private volume: () => number,
     private setVolume: (v: number) => void,
     hold: (on: boolean) => void,
+    private setPrefs: (p: Partial<FocusPrefs>) => void = () => {},
   ) {
     this.tab = engine.state.mode;
     this.linkInput.placeholder = t("Paste a YouTube link");
@@ -140,6 +141,28 @@ export class FocusView {
       row.append(presets);
     }
     left.append(phase, this.big, this.ends, track, row);
+    if (s.mode === "pomodoro") {
+      // The times, right here: focus, the short break, the long one.
+      const p = e.settings().prefs;
+      const times = el("div", "f-times");
+      const time = (label: string, value: number, min: number, max: number, set: (v: number) => void) => {
+        const box = el("span", "f-time-set");
+        box.append(
+          el("span", "f-time-label", label),
+          this.btn("M5 12h14", "−", "tiny", () => set(Math.max(min, value - (value > 10 ? 5 : 1))), 12),
+          el("b", "", `${value}`),
+          this.btn(PLUS, "+", "tiny", () => set(Math.min(max, value + (value >= 10 ? 5 : 1))), 12),
+        );
+        return box;
+      };
+      times.append(
+        time(t("Focus"), p.focus, 1, 180, (v) => this.setPrefs({ focus: v })),
+        time(t("Break"), p.short, 1, 60, (v) => this.setPrefs({ short: v })),
+        time(t("Long break"), p.long, 1, 120, (v) => this.setPrefs({ long: v })),
+        el("span", "f-time-unit", "min"),
+      );
+      left.append(times);
+    }
   }
 
   private alarms(left: HTMLElement) {
@@ -195,18 +218,25 @@ export class FocusView {
     head.append(el("span", "ctl-title", t("Music")));
     if (e.musicOn) head.append(this.btn(I.pause, t("Stop"), "small", () => e.stopMusic(), 14));
     box.append(head);
-    const stations = el("div", "f-stations");
-    for (const st of STATIONS) {
-      const on = e.musicOn && e.music?.kind === "station" && e.music.id === st.id;
-      const b = el("button", `chip${on ? " on" : ""}`, t(st.name));
-      b.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        if (on) e.stopMusic();
-        else e.playMusic({ kind: "station", id: st.id });
-      });
-      stations.append(b);
+    for (const kind of ["lofi", "ambience"] as const) {
+      box.append(el("span", "f-group", kind === "lofi" ? "Lofi" : t("Ambiences")));
+      const stations = el("div", "f-stations");
+      for (const st of STATIONS.filter((x) => x.kind === kind)) {
+        const on = e.musicOn && e.music?.kind === "station" && e.music.id === st.id;
+        const b = el("button", `chip${on ? " on" : ""}`, t(st.name));
+        b.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          if (on) e.stopMusic();
+          else e.playMusic({ kind: "station", id: st.id });
+        });
+        stations.append(b);
+      }
+      box.append(stations);
     }
-    box.append(stations);
+    const ytHead = el("div", "f-music-head");
+    const rep = this.btn(I.repeat, e.repeat ? t("Repeat: on") : t("Repeat: off"), `small rep${e.repeat ? " on" : ""}`, () => e.setRepeat(!e.repeat), 14);
+    ytHead.append(el("span", "f-group", "YouTube"), rep);
+    box.append(ytHead);
     const links = el("div", "f-links");
     for (const l of e.links) {
       const on = e.musicOn && e.music?.kind === "link" && e.music.id === l.id;

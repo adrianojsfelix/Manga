@@ -111,7 +111,7 @@ export class Kumo {
     x.save();
     x.translate(cx, cy);
     x.scale(breathe, 1 / breathe);
-    drawAhoge(x, R, f.ahoge, t, age);
+    // No strand of hair on his head: the user wanted him round and clean.
     drawBody(x, R);
     drawBlush(x, R, f.blush);
     drawEyes(x, R, blinking && (f.eyes === "open" || f.eyes === "look") ? "closed" : f.eyes, this.lookX, this.lookY, t, mood);
@@ -245,57 +245,6 @@ function drawBlush(x: CanvasRenderingContext2D, R: number, amount: number) {
   }
 }
 
-// ── The ahoge ─────────────────────────────────────────────────────────────────
-
-function drawAhoge(x: CanvasRenderingContext2D, R: number, kind: Ahoge, t: number, age: number) {
-  x.save();
-  x.translate(R * 0.08, -R * 0.96);
-  x.strokeStyle = "#cfc3e6";
-  x.lineWidth = R * 0.11;
-  x.lineCap = "round";
-  x.lineJoin = "round";
-  const L = R * 0.62;
-  x.beginPath();
-  x.moveTo(0, 0);
-  switch (kind) {
-    case "up": {
-      const shake = Math.sin(t * 30) * R * 0.02 * Math.max(0, 1 - age * 2);
-      x.lineTo(shake, -L * 1.05);
-      break;
-    }
-    case "curl": {
-      // A question mark: up, round to the right and down into a hook.
-      x.quadraticCurveTo(-R * 0.05, -L * 0.6, R * 0.18, -L * 0.85);
-      x.arc(R * 0.18, -L * 0.85 + R * 0.18, R * 0.18, -Math.PI / 2, Math.PI * 0.55);
-      break;
-    }
-    case "droop":
-      x.quadraticCurveTo(R * 0.12, -L * 0.6, R * 0.42, -L * 0.15);
-      break;
-    case "limp":
-      x.quadraticCurveTo(R * 0.25, -L * 0.45, R * 0.5, -L * 0.25 + Math.sin(t * 1.5) * R * 0.03);
-      break;
-    case "zigzag": {
-      const j = Math.sin(t * 25) * R * 0.02;
-      x.lineTo(R * 0.12 + j, -L * 0.3);
-      x.lineTo(-R * 0.1 + j, -L * 0.6);
-      x.lineTo(R * 0.12 + j, -L * 0.9);
-      break;
-    }
-    case "bounce": {
-      const s = Math.sin(t * 12) * R * 0.18;
-      x.quadraticCurveTo(s, -L * 0.55, R * 0.12 + s * 0.6, -L);
-      break;
-    }
-    default: {
-      const s = Math.sin(t * 2.4) * R * 0.1;
-      x.quadraticCurveTo(-R * 0.12 + s * 0.3, -L * 0.55, R * 0.2 + s, -L * 0.95);
-    }
-  }
-  x.stroke();
-  x.restore();
-}
-
 // ── The eyes ──────────────────────────────────────────────────────────────────
 
 function drawEyes(x: CanvasRenderingContext2D, R: number, eyes: Eyes, lx: number, ly: number, t: number, mood: Mood) {
@@ -371,18 +320,10 @@ function drawEyes(x: CanvasRenderingContext2D, R: number, eyes: Eyes, lx: number
         x.stroke();
         break;
       default: {
-        // Open (also angry, sad, look): a tall rounded eye with two shines.
+        // Open (also angry, sad, look): a tall rounded eye, plain (no shines).
         x.beginPath();
         x.ellipse(0, 0, ew * 0.62, eh * 0.62, 0, 0, Math.PI * 2);
         x.fill();
-        x.fillStyle = "#fff";
-        x.beginPath();
-        x.arc(ew * 0.18, -eh * 0.22, ew * 0.22, 0, Math.PI * 2);
-        x.fill();
-        x.beginPath();
-        x.arc(-ew * 0.16, eh * 0.2, ew * 0.1, 0, Math.PI * 2);
-        x.fill();
-        x.fillStyle = INK;
         if (eyes === "angry" || eyes === "sad") {
           // The brow: inner end down when cross, up when sad.
           x.lineWidth = R * 0.06;

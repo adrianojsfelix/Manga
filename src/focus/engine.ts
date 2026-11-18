@@ -242,6 +242,16 @@ export class FocusEngine {
   // ——— music ———
 
   musicOn = false;
+  /** YouTube links start over when they end. */
+  repeat = load("manga.repeat") !== false;
+
+  setRepeat(on: boolean) {
+    this.repeat = on;
+    keep("manga.repeat", on);
+    // A link playing starts again with the new setting.
+    if (this.musicOn && this.music?.kind === "link") this.playMusic(this.music);
+    else this.changed(false);
+  }
 
   addLink(url: string, title: string): boolean {
     if (!parseYouTube(url)) return false;
@@ -270,7 +280,7 @@ export class FocusEngine {
         this.yt = document.createElement("iframe");
         this.yt.className = "yt-player";
         this.yt.allow = "autoplay; encrypted-media";
-        this.yt.src = embedUrl(ref);
+        this.yt.src = embedUrl(ref, this.repeat);
         // The player takes commands once told someone listens; it may still be
         // loading, so the volume is sent a few times.
         this.yt.addEventListener("load", () => {

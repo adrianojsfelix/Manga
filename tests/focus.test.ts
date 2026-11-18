@@ -85,3 +85,9 @@ test("YouTube links: videos, short links, shorts and playlists", () => {
   assert.ok(embedUrl({ video: null, list: "PLOfmy3sLdTr8w" }).includes("embed/videoseries?"));
   assert.equal(sanitizeLinks([{ url: "https://youtu.be/jfKfPfyJRdk" }, { url: "x" }]).length, 1);
 });
+
+test("YouTube repeats on demand", () => {
+  assert.ok(embedUrl({ video: "jfKfPfyJRdk", list: null }, true).includes("loop=1"));
+  assert.ok(!embedUrl({ video: "jfKfPfyJRdk", list: null }, false).includes("loop=1"));
+  assert.ok(embedUrl({ video: null, list: "PLOfmy3sLdTr8w" }, true).includes("loop=1"));
+});

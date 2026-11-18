@@ -45,3 +45,30 @@ pub fn popup_close(app: AppHandle, label: String) {
         let _ = w.close();
     }
 }
+
+/// The user's own Pinterest (the home feed with the recommendations needs
+/// their login: it only exists on the site). A window of its own; WebView2
+/// keeps the login for next time. Only pinterest.com opens here.
+#[tauri::command]
+pub fn pinterest_open(app: AppHandle, path: Option<String>) -> Result<(), String> {
+    let path = path.unwrap_or_default();
+    if path.contains("://") || path.contains("..") {
+        return Err("Endereço inválido.".into());
+    }
+    let url: tauri::Url = format!("https://www.pinterest.com/{}", path.trim_start_matches('/')).parse().map_err(|_| "Endereço inválido.")?;
+    if let Some(w) = app.get_webview_window("pinterest") {
+        let _ = w.navigate(url);
+        let _ = w.show();
+        let _ = w.set_focus();
+        return Ok(());
+    }
+    WebviewWindowBuilder::new(&app, "pinterest", WebviewUrl::External(url))
+        .title("Pinterest — Manga")
+        .additional_browser_args(crate::BROWSER_ARGS)
+        .inner_size(480.0, 760.0)
+        .min_inner_size(320.0, 400.0)
+        .center()
+        .build()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}

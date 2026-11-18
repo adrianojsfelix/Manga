@@ -24,6 +24,7 @@ const SAMPLE_QUOTES: Quote[] = [
 export interface ToolsPrefs {
   feeds: string[];
   pins: string[];
+  pinSize: "s" | "m" | "l";
 }
 
 export class ToolsView {
@@ -246,7 +247,38 @@ export class ToolsView {
   }
 
   private pinsTab(body: HTMLElement) {
-    const grid = el("div", "pins");
+    const prefs = this.prefs();
+    const bar = el("div", "pins-bar");
+    const feed = el("button", "set-btn", t("My feed (recommended)"));
+    feed.title = t("Opens your Pinterest, logged in, in a window of its own");
+    feed.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (!IN_APP) {
+        this.error = t("Your feed opens in the app.");
+        this.paint();
+        return;
+      }
+      const r = await Bridge.pinterestOpen();
+      if ("error" in r) {
+        this.error = r.error;
+        this.paint();
+      }
+    });
+    const sizes = el("div", "seg");
+    for (const [id, label] of [["s", "P"], ["m", "M"], ["l", "G"]] as const) {
+      const b = el("button", prefs.pinSize === id ? "on" : "", label);
+      b.title = t("Picture size");
+      b.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.setPrefs({ ...prefs, pinSize: id });
+        this.paint();
+      });
+      sizes.append(b);
+    }
+    bar.append(feed, el("span", "m-gap"), el("span", "set-note", t("Size")), sizes);
+    body.append(bar);
+    body.classList.add("col");
+    const grid = el("div", `pins size-${prefs.pinSize}`);
     if (!this.prefs().pins.length) grid.append(el("p", "set-note", t("Add your Pinterest boards in Edit.")));
     else if (!this.pins.length && !this.loading) grid.append(el("p", "set-note", IN_APP ? t("Nothing from these boards (are they public?).") : t("The boards load in the app.")));
     for (const p of this.pins) {

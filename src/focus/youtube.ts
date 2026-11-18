@@ -30,12 +30,13 @@ export function parseYouTube(link: string): YouTubeRef | null {
 }
 
 /** The player's address: autoplay, loop, controllable from the island. */
-export function embedUrl(r: YouTubeRef): string {
+export function embedUrl(r: YouTubeRef, repeat = true): string {
   const q = new URLSearchParams({ autoplay: "1", enablejsapi: "1", playsinline: "1", rel: "0" });
   if (r.list) q.set("list", r.list);
-  if (r.video && !r.list) {
+  if (repeat) {
+    // A single video loops by being its own playlist; a playlist loops whole.
     q.set("loop", "1");
-    q.set("playlist", r.video);
+    if (r.video && !r.list) q.set("playlist", r.video);
   }
   const path = r.video ? `embed/${r.video}` : "embed/videoseries";
   return `https://www.youtube-nocookie.com/${path}?${q}`;

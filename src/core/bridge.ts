@@ -56,7 +56,7 @@ export const Bridge = {
   /** Adds (or takes out) Manga's hooks in Claude Code's settings.json. */
   ccConnect: (on: boolean) => invokeOrError<CcStatus>("claude_code_connect", { on }),
   /** What plays: "play_pause" | "next" | "previous" | "seek" (position in seconds). */
-  mediaControl: (action: "play_pause" | "next" | "previous" | "seek", position?: number) => call<boolean>("media_control", { action, position }),
+  mediaControl: (action: "play_pause" | "next" | "previous" | "seek" | "repeat", position?: number) => call<boolean>("media_control", { action, position }),
   soundGet: () => call<Sound>("sound_get"),
   soundSet: (what: "volume" | "mute" | "mic_mute" | "app_volume" | "app_mute", value: number, pid?: number) => call<boolean>("sound_set", { what, value, pid }),
   /** How loud it plays now, 0–1. */
@@ -77,6 +77,8 @@ export const Bridge = {
   openUrl: (url: string) => call<boolean>("open_url", { url }),
   /** A web page's text (https), fetched by Rust. */
   fetchText: (url: string) => invokeOrError<string>("fetch_text", { url }),
+  /** The user's Pinterest (logged in) in a window of its own; `path` inside the site. */
+  pinterestOpen: (path?: string) => invokeOrError<void>("pinterest_open", { path: path ?? null }),
   fileIcon: (path: string) => call<string | null>("file_icon", { path }),
   keyboardGet: () => call<Keyboard>("keyboard_get"),
   keyboardSet: (id: number) => call<boolean>("keyboard_set", { id }),

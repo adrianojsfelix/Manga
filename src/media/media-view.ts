@@ -5,7 +5,9 @@ import { Bridge, IN_APP } from "../core/bridge.ts";
 import { t } from "../core/i18n.ts";
 import { el, icon } from "../island/dom.ts";
 import { I } from "../island/icons.ts";
-import { clock, positionNow, subtitle, type Media } from "./media.ts";
+import { appOf, clock, positionNow, subtitle, type Media } from "./media.ts";
+
+type AppVol = { pid: number; name: string; volume: number; muted: boolean };
 
 export class MediaView {
   readonly el = el("div", "media");
@@ -14,6 +16,21 @@ export class MediaView {
   private at = el("span", "m-time");
   private end = el("span", "m-time");
   private note = el("div", "m-note");
+  /** The playing app's volume (or the speakers' when it is not found). */
+  private vol: { app: AppVol | null; master: number } | null = null;
+  private volFor = "";
+  private repeatLocal: Media["repeat"] = "none";
+
+  private async readVolume(app: string) {
+    this.volFor = app;
+    if (!IN_APP) {
+      this.vol = { app: { pid: 1, name: app, volume: 0.8, muted: false }, master: 0.6 };
+    } else {
+      const s = await Bridge.soundGet();
+      this.vol = s ? { app: appOf(s.apps, app), master: Math.max(0, s.volume) } : null;
+    }
+    this.paint();
+  }
 
   /** The user wants the video live in the cover. */
   liveWanted = false;
@@ -72,10 +89,52 @@ export class MediaView {
       return b;
     };
     const row = el("div", "m-row");
+    // Repeat: off → the whole list → this one → off.
+    const repeat = IN_APP ? (m.repeat ?? "none") : this.repeatLocal;
+    const rep = btn(I.repeat, repeat === "track" ? t("Repeating this one") : repeat === "list" ? t("Repeating the list") : t("Repeat"), `repeat ${repeat}`, () => {
+      if (!IN_APP) {
+        this.repeatLocal = repeat === "none" ? "list" : repeat === "list" ? "track" : "none";
+        this.paint();
+        return;
+      }
+      void Bridge.mediaControl("repeat");
+    }, 16);
+    if (IN_APP && m.canRepeat === false) rep.disabled = true;
+    if (repeat === "track") rep.append(el("i", "rep-one", "1"));
+
+    // The volume of the app that plays.
+    if (this.volFor !== m.app) void this.readVolume(m.app);
+    const v = this.vol;
+    const level = v ? (v.app ? v.app.volume : v.master) : 0.5;
+    const volume = el("label", "m-vol");
+    volume.title = v?.app ? t("Volume of {app}", { app: v.app.name }) : t("Volume");
+    const range = el("input");
+    range.type = "range";
+    range.min = "0";
+    range.max = "100";
+    range.value = String(Math.round(level * 100));
+    range.style.setProperty("--v", `${range.value}%`);
+    range.addEventListener("click", (e) => e.stopPropagation());
+    range.addEventListener("input", () => {
+      range.style.setProperty("--v", `${range.value}%`);
+      const x = Number(range.value) / 100;
+      if (!v) return;
+      if (v.app) {
+        v.app.volume = x;
+        void Bridge.soundSet("app_volume", x, v.app.pid);
+      } else {
+        v.master = x;
+        void Bridge.soundSet("volume", x);
+      }
+    });
+    volume.append(icon(I.volume, 15), range);
+
     row.append(
+      rep,
       btn(I.prev, t("Previous"), "", () => void Bridge.mediaControl("previous")),
       btn(m.playing ? I.pause : I.play, m.playing ? t("Pause") : t("Play"), "main", () => void Bridge.mediaControl("play_pause"), 20),
       btn(I.next, t("Next"), "", () => void Bridge.mediaControl("next")),
+      volume,
       el("span", "m-gap"),
       btn(I.windows, this.liveWanted ? t("Show the cover") : t("Watch here"), this.liveWanted ? "on" : "", () => {
         if (!IN_APP) {
