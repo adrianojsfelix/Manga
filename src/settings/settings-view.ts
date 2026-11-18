@@ -14,10 +14,11 @@ import type { AlertMood, AlertPlace, FocusSettings } from "../core/settings.ts";
 import { TONES, playTone } from "../focus/tones.ts";
 import { DOCK_PAGES } from "../core/settings.ts";
 import { geocodeUrl, parsePlaces, type Place } from "../day/weather.ts";
+import { saveProfile, type LookPrefs, type Profile } from "../core/look.ts";
 import type { Page } from "../core/island-state.ts";
 import { BUILT_PHASE, ITEMS, type ItemId, type ItemPrefs } from "../items/registry.ts";
 
-type Tab = "assistant" | "claude" | "focus" | "day" | "notifications" | "island";
+type Tab = "assistant" | "claude" | "focus" | "day" | "notifications" | "island" | "look";
 
 const SECRET: Record<Provider, SecretName> = { claude: "anthropic", gemini: "gemini" };
 const AI: { id: Provider; name: string; keyHint: string; model: string; cli: string }[] = [
@@ -57,7 +58,7 @@ export class SettingsView {
 
   paint() {
     const tabs = el("div", "set-tabs");
-    for (const [id, label] of [["assistant", "Assistant"], ["claude", "Claude Code"], ["focus", "Focus"], ["day", "The day"], ["notifications", "Notifications"], ["island", "Island"]] as [Tab, string][]) {
+    for (const [id, label] of [["assistant", "Assistant"], ["claude", "Claude Code"], ["focus", "Focus"], ["day", "The day"], ["notifications", "Notifications"], ["island", "Island"], ["look", "Appearance"]] as [Tab, string][]) {
       const b = el("button", `set-tab${this.tab === id ? " on" : ""}`, t(label));
       b.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -71,6 +72,7 @@ export class SettingsView {
     else if (this.tab === "claude") this.claudeCode(body);
     else if (this.tab === "focus") this.focus(body);
     else if (this.tab === "day") this.dayTab(body);
+    else if (this.tab === "look") this.lookTab(body);
     else if (this.tab === "notifications") this.notifications(body);
     else this.island(body);
     this.el.replaceChildren(tabs, body);
@@ -251,6 +253,144 @@ export class SettingsView {
       this.row(t("Ring until dismissed"), onOff(a.repeat, (v) => setA({ repeat: v }))),
     );
     body.append(card);
+  }
+
+  private monitorList: { index: number; name: string; width: number; height: number; primary: boolean }[] | null = null;
+  private profileName = el("input", "set-input");
+
+  private profiles(): Profile<{ look: LookPrefs; island: Settings["island"]; items: ItemPrefs }>[] {
+    try {
+      const raw = JSON.parse(localStorage.getItem("manga.profiles") ?? "[]");
+      return Array.isArray(raw) ? raw.filter((p) => p && typeof p.name === "string" && p.data) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private keepProfiles(list: unknown) {
+    try {
+      localStorage.setItem("manga.profiles", JSON.stringify(list));
+    } catch {
+      /* storage off */
+    }
+  }
+
+  private swatches(value: string, colors: string[], set: (c: string) => void) {
+    const box = el("div", "set-chips");
+    for (const c of colors) {
+      const sw = el("button", `swatch${value === c ? " on" : ""}`);
+      sw.style.background = c;
+      sw.title = c;
+      sw.addEventListener("click", (e) => {
+        e.stopPropagation();
+        set(c);
+        this.paint();
+      });
+      box.append(sw);
+    }
+    const pick = el("input", "swatch-pick");
+    pick.type = "color";
+    pick.value = value;
+    pick.title = this.t("Another colour");
+    pick.addEventListener("change", () => {
+      set(pick.value);
+      this.paint();
+    });
+    box.append(pick);
+    return box;
+  }
+
+  private t(key: string) {
+    return t(key);
+  }
+
+  private lookTab(body: HTMLElement) {
+    const s = this.settings();
+    const l = s.look;
+    const setL = (p: Partial<LookPrefs>) => this.change({ look: { ...l, ...p } });
+
+    const colors = el("div", "set-box");
+    colors.append(el("div", "set-title", t("Colours")));
+    const glass = el("input", "set-range");
+    glass.type = "range";
+    glass.min = "0.5";
+    glass.max = "1";
+    glass.step = "0.05";
+    glass.value = String(l.glass);
+    glass.addEventListener("change", () => setL({ glass: Number(glass.value) }));
+    colors.append(
+      this.row(t("Island"), this.swatches(l.color, ["#000000", "#16141f", "#1d2433", "#2a1d2e", "#13261f", "#2b2118"], (color) => setL({ color }))),
+      this.row(t("Glass"), glass),
+      this.row(t("Accent"), this.swatches(l.accent, ["#8b7cf6", "#f4505e", "#f59e0b", "#22c55e", "#0ea5e9", "#ec4899", "#e8e2d8"], (accent) => setL({ accent }))),
+      this.row(t("Glow around"), this.segmented(l.glow ? "on" : "off", [["on", t("On")], ["off", t("Off")]], (v) => setL({ glow: v === "on" }))),
+      this.row(t("Font of the top"), this.segmented(l.font, [["mono", t("Typewriter")], ["sans", t("Clean")]], (font) => setL({ font }))),
+    );
+    body.append(colors);
+
+    const behave = el("div", "set-box");
+    behave.append(el("div", "set-title", t("Behaviour")));
+    const fold = el("input", "set-range");
+    fold.type = "range";
+    fold.min = "0.3";
+    fold.max = "6";
+    fold.step = "0.1";
+    fold.value = String(l.fold);
+    const foldLabel = el("span", "set-unit", `${l.fold.toLocaleString("pt-BR")} s`);
+    fold.addEventListener("input", () => (foldLabel.textContent = `${Number(fold.value).toLocaleString("pt-BR")} s`));
+    fold.addEventListener("change", () => setL({ fold: Number(fold.value) }));
+    const monitors = this.monitorList;
+    if (!monitors) void Bridge.monitors().then((m) => ((this.monitorList = m ?? []), this.paint()));
+    const screens: [string, string][] = [["current", t("Where it is")], ["primary", t("Main screen")]];
+    if (monitors && monitors.length > 1) for (const m of monitors) screens.push([String(m.index), `${t("Screen")} ${m.index + 1}${m.primary ? " ★" : ""}`]);
+    behave.append(
+      this.row(t("Opens with"), this.segmented(l.open, [["click", t("A click")], ["hover", t("The pointer resting")]], (open) => setL({ open }))),
+      this.row(t("Folds after"), fold, foldLabel),
+      this.row(t("Apps in full screen"), this.segmented(l.fullscreen, [["hide", t("Hide the island")], ["keep", t("Keep it")]], (fullscreen) => setL({ fullscreen }))),
+      this.row(t("Screen"), this.segmented(l.monitor, screens, (monitor) => setL({ monitor }))),
+    );
+    body.append(behave);
+
+    const prof = el("div", "set-box");
+    prof.append(el("div", "set-title", t("Profiles")));
+    prof.append(el("p", "set-note", t("Keep the whole look — colours, sizes, items, tabs — under a name, and switch with a click.")));
+    const list = this.profiles();
+    if (list.length) {
+      const chips = el("div", "set-chips");
+      for (const p of list) {
+        const c = el("span", "profile");
+        const use = el("button", "chip", p.name);
+        use.title = t("Use this profile");
+        use.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.change({ look: p.data.look, island: p.data.island });
+          this.items.set(p.data.items);
+          this.paint();
+        });
+        const del = el("button", "profile-del", "×");
+        del.title = t("Remove");
+        del.addEventListener("click", (e) => {
+          e.stopPropagation();
+          this.keepProfiles(list.filter((x) => x.name !== p.name));
+          this.paint();
+        });
+        c.append(use, del);
+        chips.append(c);
+      }
+      prof.append(chips);
+    }
+    this.profileName.placeholder = t("Name (Work, Games, Focus…)");
+    typing(this.profileName, this.hold);
+    const save = el("button", "set-btn", t("Save the current look"));
+    save.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const name = this.profileName.value.trim();
+      if (!name) return;
+      this.keepProfiles(saveProfile(list, name, { look: s.look, island: s.island, items: this.items.get() }));
+      this.profileName.value = "";
+      this.paint();
+    });
+    prof.append(this.row(t("New profile"), this.profileName, save));
+    body.append(prof);
   }
 
   private places: Place[] = [];

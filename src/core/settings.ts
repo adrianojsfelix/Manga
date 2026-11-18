@@ -3,6 +3,7 @@ import type { Page, Rest } from "./island-state.ts";
 import { DEFAULT_FEEDS } from "../tools/feeds.ts";
 import { DEFAULT_WATER, sanitizeWater, type WaterPrefs } from "../day/day.ts";
 import type { Place } from "../day/weather.ts";
+import { DEFAULT_LOOK, sanitizeLook, type LookPrefs } from "./look.ts";
 
 // What the user sets, saved in the page's storage (never the API keys: those
 // go to Windows' Credential Manager through Rust). Pure: tested on its own.
@@ -49,6 +50,7 @@ export interface Settings {
   controls: string[];
   /** The clipboard's history is kept (in memory only). */
   clipboard: boolean;
+  look: LookPrefs;
   day: {
     /** The weather's city. */
     place: Place | null;
@@ -134,6 +136,7 @@ export const DEFAULT_SETTINGS: Settings = {
   island: { shape: "notch", rest: "small", scale: 1, center: "clock", dock: ["home", "assistant", "media", "focus", "controls", "desk", "system", "tools", "today"] },
   controls: DEFAULT_CONTROLS,
   clipboard: true,
+  look: DEFAULT_LOOK,
   day: { place: null, calendars: [], water: DEFAULT_WATER },
   tools: { feeds: DEFAULT_FEEDS, pins: [] },
 };
@@ -176,6 +179,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     claudeCode: { ask: typeof obj(r.claudeCode).ask === "boolean" ? (obj(r.claudeCode).ask as boolean) : d.claudeCode.ask },
     controls: Array.isArray(r.controls) ? [...new Set(r.controls.filter((c): c is string => typeof c === "string"))].slice(0, 30) : d.controls,
     clipboard: typeof r.clipboard === "boolean" ? r.clipboard : d.clipboard,
+    look: sanitizeLook(r.look),
     day: {
       place: placeOf(obj(r.day).place),
       calendars: strings(obj(r.day).calendars, []).filter((u) => /^(https|webcal):\/\//.test(u)),

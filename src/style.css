@@ -1043,3 +1043,16 @@ body.browser {
 .head-app-icon { width: 15px; height: 15px; border-radius: 3px; background: rgba(255, 255, 255, 0.15) center / contain no-repeat; font: 700 8.5px/15px var(--font); color: #ddd; text-align: center; letter-spacing: 0; }
 .head-app-icon[style*="background-image"] { background-color: transparent; }
 .hud.keyboard .hud-lock { width: auto; padding: 0 6px; font: 700 11px var(--font); }
+
+/* The user's look. */
+#island.glow { box-shadow: 0 6px 24px color-mix(in srgb, var(--accent) 55%, transparent), inset 0 -2px 0 color-mix(in srgb, var(--accent) 85%, transparent); }
+body.font-sans .head, body.font-sans .small-center, body.font-sans .card-label, body.font-sans .m-app, body.font-sans .countdown { font-family: var(--font); letter-spacing: 0.02em; }
+body.light-island #island { color: #17131f; }
+body.light-island .head, body.light-island .small-center, body.light-island .head-menu, body.light-island .head-items, body.light-island .dock-label, body.light-island .dock-btn { color: #2a2433; }
+.set-btn, .chat-send, .calc-key.eq { background: var(--accent); color: var(--accent-ink, #fff); }
+.set-btn.quiet { background: rgba(255, 255, 255, 0.08); color: var(--dim); }
+.swatch-pick { width: 26px; height: 24px; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.profile { display: inline-flex; align-items: center; }
+.profile .chip { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.profile-del { height: 24px; padding: 0 7px; border: 1px solid rgba(255, 255, 255, 0.1); border-left: 0; border-radius: 0 999px 999px 0; background: transparent; color: var(--dim); }
+.profile-del:hover { color: #f4505e; }

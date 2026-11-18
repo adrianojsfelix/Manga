@@ -31,6 +31,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             island::island_layout,
             island::island_focus,
+            island::monitors,
+            island::island_monitor,
+            island::island_visible,
             secrets::secret_set,
             secrets::secret_has,
             secrets::secret_clear,

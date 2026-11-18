@@ -93,10 +93,14 @@ Cada fase termina com o app funcionando, testado e checado contra o Windows.
 - ✅ Energia: bloquear, suspender, reiniciar, desligar (na central, fase extra).
 
 ## Fase 7 — Personalização robusta
-- **Escolher e ordenar os itens** da ilha arrastando, por tamanho.
-- Cores (preto, grafite, claro, cor do Windows, gradiente, a sua), **vidro**,
-  borda brilhante, opacidade, cantos, tamanho, posição.
-- Esconder em tela cheia; uma ilha em cada monitor; perfis.
+- ✅ **Escolher e ordenar os itens** de cada tamanho (na ordem dos cliques) e as
+  abas do dock.
+- ✅ Cores da ilha (e a sua), **vidro**, **cor de destaque**, brilho em volta,
+  fonte do topo, tamanho, formato notch ou destacada.
+- ✅ Abrir com um clique ou com o mouse parado em cima; tempo para fechar.
+- ✅ **Esconder em tela cheia** (só quando é na tela da ilha); escolher a tela.
+- ✅ **Perfis**: o visual inteiro com um nome, trocado com um clique.
+- Depois: arrastar para ordenar, uma ilha em cada monitor.
 
 ## Fase 8 — Instalador e atualizações
 - Instalador para Windows e aviso de versão nova pelo GitHub.

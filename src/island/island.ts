@@ -18,7 +18,7 @@ import { MediaView } from "../media/media-view.ts";
 import { apply, project, type CcAsk, type CcEvent, type Session } from "../claude-code/sessions.ts";
 import { Bridge, IN_APP, on } from "../core/bridge.ts";
 import { borderRadius, earSize, islandBox, windowSize, type Box } from "../core/geometry.ts";
-import { FOLD_AFTER_MS, INITIAL, next, type IslandEvent, type IslandState, type Page } from "../core/island-state.ts";
+import { INITIAL, next, type IslandEvent, type IslandState, type Page } from "../core/island-state.ts";
 import { language, t } from "../core/i18n.ts";
 import type { Settings } from "../core/settings.ts";
 import { itemView, type ItemContext, type ItemPrefs } from "../items/registry.ts";
@@ -33,6 +33,7 @@ import { FocusView } from "../focus/focus-view.ts";
 import { clock as focusClock, shown as focusShown } from "../focus/timer.ts";
 import { playTone } from "../focus/tones.ts";
 import { I } from "./icons.ts";
+import { background, inkOn } from "../core/look.ts";
 import { SettingsView } from "../settings/settings-view.ts";
 import { SystemView } from "../sysinfo/system-view.ts";
 import { ToolsView } from "../tools/tools-view.ts";
@@ -197,6 +198,8 @@ export class Island {
   private chat: ChatView;
   private settingsView: SettingsView;
   private foldTimer: number | null = null;
+  private hoverTimer: number | null = null;
+  private fullscreen = false;
   /** What holds the island open: the pin, a text field in use. */
   private holds = new Set<string>();
   private ask: AskView;
@@ -334,6 +337,13 @@ export class Island {
       if (items.includes("recycle")) void Bridge.winState().then((w) => ((this.bin = w?.binItems), this.renderHead()));
     }, 4000);
     this.listenDrops();
+    // Full screen: the island steps aside (if the user wants it so).
+    on<boolean>("fullscreen", (full) => {
+      this.fullscreen = full;
+      void Bridge.islandVisible(!(full && this.settings.look.fullscreen === "hide"));
+    });
+    void Bridge.islandMonitor(settings.look.monitor);
+    this.applyLook();
     this.toolsView = new ToolsView(
       () => this.settings.tools,
       (tools) => this.change({ tools }),
@@ -400,11 +410,19 @@ export class Island {
     this.shell.addEventListener("mouseenter", () => {
       if (this.foldTimer != null) window.clearTimeout(this.foldTimer);
       this.dispatch({ type: "enter" });
+      // Opening on hover: after a short rest, so passing by does not open it.
+      if (this.settings.look.open === "hover" && this.state.size !== "extended") {
+        if (this.hoverTimer != null) window.clearTimeout(this.hoverTimer);
+        this.hoverTimer = window.setTimeout(() => {
+          if (this.state.pointerInside) this.dispatch({ type: "click" });
+        }, 350);
+      }
     });
     this.shell.addEventListener("mouseleave", () => {
+      if (this.hoverTimer != null) window.clearTimeout(this.hoverTimer);
       this.dispatch({ type: "leave" });
       if (this.foldTimer != null) window.clearTimeout(this.foldTimer);
-      this.foldTimer = window.setTimeout(() => this.dispatch({ type: "fold" }), FOLD_AFTER_MS);
+      this.foldTimer = window.setTimeout(() => this.dispatch({ type: "fold" }), this.settings.look.fold * 1000);
     });
     this.shell.addEventListener("click", () => {
       if (this.state.size !== "extended") this.kumo.flash("happy", 1.2);
@@ -535,6 +553,16 @@ export class Island {
     const before = this.state;
     this.state = next(this.state, e);
     if (before !== this.state) this.render();
+  }
+
+  /** The user's look: the accent everywhere, the font, the island's colour. */
+  private applyLook() {
+    const l = this.settings.look;
+    const root = document.documentElement.style;
+    root.setProperty("--accent", l.accent);
+    root.setProperty("--accent-ink", inkOn(l.accent));
+    document.body.classList.toggle("font-sans", l.font === "sans");
+    document.body.classList.toggle("light-island", inkOn(l.color) !== "#f5f3fa");
   }
 
   setLook(look: Partial<Look>) {
@@ -794,6 +822,12 @@ export class Island {
     this.save(this.settings);
     if (p.notifications && p.notifications.on !== before.notifications.on) void Bridge.notificationsWatch(p.notifications.on);
     if (p.focus) this.focus.prefsChanged();
+    if (p.look) {
+      this.applyLook();
+      if (p.look.monitor !== before.look.monitor) void Bridge.islandMonitor(p.look.monitor);
+      if (p.look.fullscreen !== before.look.fullscreen) void Bridge.islandVisible(!(this.fullscreen && p.look.fullscreen === "hide"));
+      this.render();
+    }
     if (p.day && (p.day.place !== before.day.place || p.day.calendars !== before.day.calendars)) void this.day.refresh(true);
     if (p.island) {
       if (p.island.rest !== before.island.rest) this.dispatch({ type: "rest", size: p.island.rest });
@@ -868,12 +902,12 @@ export class Island {
         : this.banner.current && s.size !== "extended"
           ? " noticing"
           : "";
-    this.shell.className = `${s.size} ${shape}${look.glow ? " glow" : ""}${overlay}`;
+    this.shell.className = `${s.size} ${shape}${look.glow || this.settings.look.glow ? " glow" : ""}${overlay}`;
     this.shell.style.width = `${box.width}px`;
     this.shell.style.height = `${box.height}px`;
     this.shell.style.borderRadius = borderRadius(box, shape);
     this.shell.style.marginTop = `${box.gap}px`;
-    this.shell.style.setProperty("--bg", look.color);
+    this.shell.style.setProperty("--bg", look.color !== "#000" ? look.color : background(this.settings.look.color, this.settings.look.glass));
     const tint = look.tint ?? (s.size === "extended" && this.media ? this.coverTint.tint : null);
     this.shell.style.setProperty("--tint", tint ?? "none");
     const showsMedia = !!this.media?.playing && s.size === "small";

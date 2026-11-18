@@ -34,6 +34,9 @@ export const Bridge = {
   layout: (width: number, height: number) => call<void>("island_layout", { width, height }),
   /** Lets the island take the keyboard (a text field) or gives it back. */
   focus: (on: boolean) => call<void>("island_focus", { on }),
+  monitors: () => call<{ index: number; name: string; width: number; height: number; primary: boolean }[]>("monitors"),
+  islandMonitor: (choice: string) => call<void>("island_monitor", { choice }),
+  islandVisible: (on: boolean) => call<void>("island_visible", { on }),
   /** Saves an API key in Windows' Credential Manager. */
   secretSet: (name: SecretName, value: string) => call<boolean>("secret_set", { name, value }),
   secretHas: (name: SecretName) => call<boolean>("secret_has", { name }),
