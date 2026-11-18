@@ -80,12 +80,17 @@ Cada fase termina com o app funcionando, testado e checado contra o Windows.
 - Depois: relógio de outras cidades, previsão por hora, lembrete de tarefas.
 
 ## Fase 6 — O Windows na ilha
-- **Lixeira** (quantos itens, abrir, esvaziar).
-- **Teclado e idioma** (trocar o layout; aviso de Caps Lock / Num Lock).
-- **Programas da barra de tarefas**: os abertos e os fixados, para alternar
-  e abrir pela ilha.
-- Energia: bloquear, suspender, reiniciar, desligar. Prateleira de arquivos
-  e área de transferência.
+- ✅ **Lixeira**: quantos itens e o tamanho, abrir, esvaziar; item na barra.
+- ✅ **Teclado e idioma**: os layouts instalados, trocar pela ilha (ou pelo
+  item da barra), aviso quando muda; Caps / Num / Scroll Lock (antes).
+- ✅ **Apps da barra de tarefas**: as janelas abertas (alternar, minimizar,
+  fechar) e os fixados (abrir); item com os ícones dos abertos na barra.
+- ✅ **Área de transferência**: histórico só na memória (nunca salvo), sem o
+  que os gerenciadores de senha marcam como privado; textos e imagens;
+  clique para copiar de novo.
+- ✅ **Prateleira**: arraste arquivos para a ilha; abrir, mostrar na pasta,
+  copiar (para colar em qualquer pasta).
+- ✅ Energia: bloquear, suspender, reiniciar, desligar (na central, fase extra).
 
 ## Fase 7 — Personalização robusta
 - **Escolher e ordenar os itens** da ilha arrastando, por tamanho.

@@ -36,7 +36,7 @@ export const ITEMS: readonly ItemDef[] = [
 ];
 
 /** The phase this build has reached: items beyond it are not drawn yet. */
-export const BUILT_PHASE = 5;
+export const BUILT_PHASE = 6;
 
 export interface ItemPrefs {
   /** Shown in the small island (at most two). */
@@ -74,6 +74,8 @@ export interface ItemContext {
   sys?: { cpu: number; ramUsed: number; ramTotal: number; down: number; up: number } | null;
   /** The day: the weather now, the next event, the water. */
   day?: { temp?: number; icon?: string; next?: string; ml?: number; goal?: number };
+  /** Items in the Recycle Bin (undefined: not read). */
+  bin?: number;
 }
 
 function rate(b: number): string {
@@ -99,6 +101,8 @@ export function itemView(id: ItemId, now: Date, ctx: ItemContext = {}): ItemView
       return ctx.day?.next ? { text: ctx.day.next } : null;
     case "water":
       return ctx.day?.goal ? { text: `💧 ${Math.round(((ctx.day.ml ?? 0) / ctx.day.goal) * 100)}%` } : null;
+    case "recycle":
+      return ctx.bin != null ? { text: `🗑 ${ctx.bin}` } : null;
     case "cpu":
       return ctx.sys ? { text: `CPU ${Math.round(ctx.sys.cpu)}%` } : null;
     case "ram":

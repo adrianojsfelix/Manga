@@ -69,6 +69,18 @@ export const Bridge = {
   openUrl: (url: string) => call<boolean>("open_url", { url }),
   /** A web page's text (https), fetched by Rust. */
   fetchText: (url: string) => invokeOrError<string>("fetch_text", { url }),
+  fileIcon: (path: string) => call<string | null>("file_icon", { path }),
+  keyboardGet: () => call<Keyboard>("keyboard_get"),
+  keyboardSet: (id: number) => call<boolean>("keyboard_set", { id }),
+  appsOpen: () => call<AppWindow[]>("apps_open"),
+  appWindow: (id: number, action: "activate" | "minimize" | "close") => call<boolean>("app_window", { id, action }),
+  appsPinned: () => call<{ name: string; path: string }[]>("apps_pinned"),
+  appLaunch: (path: string) => call<boolean>("app_launch", { path }),
+  clipboardHistory: () => call<Clip[]>("clipboard_history"),
+  clipboardUse: (id: number) => call<boolean>("clipboard_use", { id }),
+  clipboardClear: () => call<void>("clipboard_clear"),
+  clipboardWatch: (on: boolean) => call<void>("clipboard_watch", { on }),
+  copyFiles: (paths: string[]) => call<boolean>("copy_files", { paths }),
   locksGet: () => call<{ caps: boolean; num: boolean; scroll: boolean }>("locks_get"),
   /** Opens a file (reveal: its folder, with it selected). */
   openPath: (path: string, reveal = false) => call<boolean>("open_path", { path, reveal }),
@@ -82,6 +94,28 @@ export const Bridge = {
     call<void>("popup_open", { label, page: `${label}.html`, data, width, height, place }),
   popupClose: (label: "alert" | "rest") => call<void>("popup_close", { label }),
 };
+
+export interface Keyboard {
+  layouts: { id: number; locale: string; short: string; name: string }[];
+  current: number;
+}
+
+export interface AppWindow {
+  id: number;
+  title: string;
+  app: string;
+  exe: string;
+  active: boolean;
+  minimized: boolean;
+}
+
+export interface Clip {
+  id: number;
+  kind: "text" | "image" | "files";
+  text: string;
+  thumb: string;
+  at: number;
+}
 
 export interface SysInfoRaw {
   cpu: number;

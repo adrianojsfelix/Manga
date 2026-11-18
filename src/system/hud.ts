@@ -13,9 +13,10 @@ export type HudItem =
   | { kind: "shot"; shot: Shot }
   | { kind: "done"; download: Download; folder: string }
   | { kind: "ring"; ring: Ring; color: string; act: (id: string) => void }
-  | { kind: "water"; text: string; drink: () => void };
+  | { kind: "water"; text: string; drink: () => void }
+  | { kind: "keyboard"; short: string; name: string };
 
-const SECONDS: Record<HudItem["kind"], number> = { lock: 1.6, shot: 6, done: 6, ring: 60, water: 12 };
+const SECONDS: Record<HudItem["kind"], number> = { lock: 1.6, shot: 6, done: 6, ring: 60, water: 12, keyboard: 1.8 };
 
 export class Hud {
   readonly el = el("div", "hud");
@@ -28,7 +29,7 @@ export class Hud {
   constructor(private changed: () => void) {
     this.el.addEventListener("mouseenter", () => {
       // A lock key's note is too short to hold.
-      if (this.current?.kind === "lock") return;
+      if (this.current?.kind === "lock" || this.current?.kind === "keyboard") return;
       this.hovering = true;
       if (this.timer != null) window.clearTimeout(this.timer);
     });
@@ -92,6 +93,11 @@ export class Hud {
       });
       text.append(row);
       this.el.append(this.ringFace ?? el("span"), text);
+      return;
+    }
+    if (h.kind === "keyboard") {
+      this.el.className = "hud lock keyboard";
+      this.el.append(el("span", "hud-lock on", h.short), el("span", "hud-lock-name", h.name), el("span", "hud-state on", t("Keyboard")));
       return;
     }
     if (h.kind === "water") {

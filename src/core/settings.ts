@@ -47,6 +47,8 @@ export interface Settings {
   };
   /** The control center's buttons, in order. */
   controls: string[];
+  /** The clipboard's history is kept (in memory only). */
+  clipboard: boolean;
   day: {
     /** The weather's city. */
     place: Place | null;
@@ -62,7 +64,7 @@ export interface Settings {
   };
 }
 
-export const DOCK_PAGES: Page[] = ["home", "assistant", "media", "focus", "controls", "system", "tools", "notes", "today"];
+export const DOCK_PAGES: Page[] = ["home", "assistant", "media", "focus", "controls", "desk", "system", "tools", "notes", "today"];
 export const DEFAULT_CONTROLS = ["wifi", "bluetooth", "dnd", "mic", "airplane", "dark", "power", "lock"];
 
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
@@ -129,8 +131,9 @@ export const DEFAULT_SETTINGS: Settings = {
   notifications: { on: true, ignored: [], seconds: 6, quiet: false },
   focus: DEFAULT_FOCUS,
   claudeCode: { ask: true },
-  island: { shape: "notch", rest: "small", scale: 1, center: "clock", dock: ["home", "assistant", "media", "focus", "controls", "system", "tools", "today"] },
+  island: { shape: "notch", rest: "small", scale: 1, center: "clock", dock: ["home", "assistant", "media", "focus", "controls", "desk", "system", "tools", "today"] },
   controls: DEFAULT_CONTROLS,
+  clipboard: true,
   day: { place: null, calendars: [], water: DEFAULT_WATER },
   tools: { feeds: DEFAULT_FEEDS, pins: [] },
 };
@@ -172,6 +175,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     focus: sanitizeFocus(r.focus),
     claudeCode: { ask: typeof obj(r.claudeCode).ask === "boolean" ? (obj(r.claudeCode).ask as boolean) : d.claudeCode.ask },
     controls: Array.isArray(r.controls) ? [...new Set(r.controls.filter((c): c is string => typeof c === "string"))].slice(0, 30) : d.controls,
+    clipboard: typeof r.clipboard === "boolean" ? r.clipboard : d.clipboard,
     day: {
       place: placeOf(obj(r.day).place),
       calendars: strings(obj(r.day).calendars, []).filter((u) => /^(https|webcal):\/\//.test(u)),

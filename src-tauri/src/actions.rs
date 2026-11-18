@@ -16,7 +16,8 @@ pub struct WinState {
     pub bin_bytes: u64,
 }
 
-const PAGES: [&str; 14] = [
+const PAGES: [&str; 15] = [
+    "shell:RecycleBinFolder",
     "ms-settings:display",
     "ms-settings:nightlight",
     "ms-settings:sound",

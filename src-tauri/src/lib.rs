@@ -4,6 +4,7 @@ mod actions;
 mod audio;
 mod brightness;
 mod chat;
+mod desk;
 mod claude_code;
 mod island;
 mod media;
@@ -53,6 +54,18 @@ pub fn run() {
             pip::media_live,
             pip::media_live_off,
             system::fetch_text,
+            system::file_icon,
+            desk::keyboard_get,
+            desk::keyboard_set,
+            desk::apps_open,
+            desk::app_window,
+            desk::apps_pinned,
+            desk::app_launch,
+            desk::clipboard_history,
+            desk::clipboard_use,
+            desk::clipboard_clear,
+            desk::clipboard_watch,
+            desk::copy_files,
             system::locks_get,
             system::open_path,
             system::downloads_folder,
@@ -72,6 +85,7 @@ pub fn run() {
             claude_code::start(handle.clone());
             media::start(handle.clone());
             system::start(handle.clone());
+            desk::start(handle.clone());
             // The tray: the only way out while the island has no menu of its own.
             let quit = MenuItem::with_id(app, "quit", "Sair do Manga", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&quit])?;

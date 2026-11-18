@@ -510,7 +510,7 @@ export class SettingsView {
 
     const open = el("div", "set-box");
     open.append(el("div", "set-title", t("Open island: the dock's tabs")));
-    const names: Record<string, string> = { home: "Home", assistant: "Assistant", media: "Media", focus: "Focus", controls: "Controls", system: "System", tools: "Utilities", notes: "Notes", today: "Today" };
+    const names: Record<string, string> = { desk: "Windows", home: "Home", assistant: "Assistant", media: "Media", focus: "Focus", controls: "Controls", system: "System", tools: "Utilities", notes: "Notes", today: "Today" };
     open.append(this.picker(DOCK_PAGES.map((p) => ({ id: p, name: t(names[p]) })), i.dock, 9, (dock) => setI({ dock: dock as Page[] })));
     body.append(open);
   }

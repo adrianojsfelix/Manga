@@ -40,7 +40,43 @@ import { DayStore } from "../day/store.ts";
 import { TodayView, when } from "../day/today-view.ts";
 import { NotesView } from "../day/notes-view.ts";
 import { sky } from "../day/weather.ts";
+import { DeskView } from "../desk/desk-view.ts";
+import { addToShelf, nextLayout, sanitizeShelf, type ShelfItem } from "../desk/shelf.ts";
+import type { AppWindow, Keyboard } from "../core/bridge.ts";
 import { Canvas, el, icon } from "./dom.ts";
+
+function loadJson(key: string): unknown {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveJson(key: string, v: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(v));
+  } catch {
+    /* storage off */
+  }
+}
+
+const appIcons = new Map<string, string | null>();
+
+/** An app's icon from its program, fetched once. */
+function appIcon(exe: string, fallback: string): HTMLElement {
+  const e = el("span", "head-app-icon", fallback);
+  const known = appIcons.get(exe);
+  if (known) {
+    e.textContent = "";
+    e.style.backgroundImage = `url("${known}")`;
+  } else if (known === undefined && exe && IN_APP) {
+    appIcons.set(exe, null);
+    void Bridge.fileIcon(exe).then((src) => appIcons.set(exe, src));
+  }
+  return e;
+}
 
 export interface Look {
   /** The island's colour (a solid or translucent colour, so the ears match). */
@@ -62,6 +98,7 @@ const ICON: Record<Page, string> = {
   system: "M4 5h16v11H4zM9 20h6M12 16v4M7 12l2.5-3 2.5 2 3-4 2 2",
   tools: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM16.5 13v7M13 16.5h7",
   today: "M4.5 6h15v14h-15zM4.5 10h15M8.5 3.5v4M15.5 3.5v4M8 13.5h2M14 13.5h2M8 17h2",
+  desk: "M4 5.5l7-1v7H4zM13 4.2l7-1v8.3h-7zM4 12.5h7v7l-7-1zM13 12.5h7v8.3l-7-1z",
   settings:
     "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 13.5l1.6 1.2-2 3.4-1.9-.7a7 7 0 0 1-2 1.2L14.8 21h-4l-.3-2.4a7 7 0 0 1-2-1.2l-1.9.7-2-3.4 1.6-1.2a7 7 0 0 1 0-2.4L4.6 9.9l2-3.4 1.9.7a7 7 0 0 1 2-1.2l.3-2.4h4l.3 2.4a7 7 0 0 1 2 1.2l1.9-.7 2 3.4-1.6 1.2a7 7 0 0 1 0 2.4z",
 };
@@ -72,6 +109,7 @@ const PAGES: { id: Page; label: string; phase: number }[] = [
   { id: "media", label: "Media", phase: 3 },
   { id: "focus", label: "Focus", phase: 4 },
   { id: "controls", label: "Controls", phase: 3 },
+  { id: "desk", label: "Windows", phase: 6 },
   { id: "system", label: "System", phase: 4 },
   { id: "tools", label: "Utilities", phase: 4 },
   { id: "today", label: "Today", phase: 5 },
@@ -136,6 +174,11 @@ export class Island {
   readonly day: DayStore;
   private todayView: TodayView;
   private notesView: NotesView;
+  private deskView: DeskView;
+  private shelf: ShelfItem[] = sanitizeShelf(loadJson("manga.shelf"));
+  private keyboard: Keyboard | null = null;
+  private openApps: AppWindow[] = [];
+  private bin: number | undefined;
   private liveRect = "";
   readonly focus: FocusEngine;
   private focusView: FocusView;
@@ -261,6 +304,36 @@ export class Island {
       if (this.shownPage === "home") this.shownPage = null;
       this.renderHead();
     });
+    this.deskView = new DeskView(
+      () => this.shelf,
+      (s) => {
+        this.shelf = s;
+        saveJson("manga.shelf", s);
+      },
+      () => this.settings.clipboard,
+      (clipboard) => {
+        this.change({ clipboard });
+        void Bridge.clipboardWatch(clipboard);
+      },
+    );
+    void Bridge.clipboardWatch(settings.clipboard);
+    on("clipboard", () => void this.deskView.clipboardChanged());
+    on<Keyboard>("keyboard", (k) => {
+      const before = this.keyboard?.current;
+      this.keyboard = k;
+      const now = k.layouts.find((l) => l.id === k.current);
+      if (before != null && before !== k.current && now) this.hud.show({ kind: "keyboard", short: now.short, name: now.name });
+      else this.renderHead();
+    });
+    void Bridge.keyboardGet().then((k) => (this.keyboard = k));
+    // The bar's taskbar and Recycle Bin items read Windows every few seconds.
+    window.setInterval(() => {
+      const items = this.items.medium;
+      if (this.state.size === "small") return;
+      if (items.includes("taskbar")) void Bridge.appsOpen().then((a) => ((this.openApps = a ?? []), this.renderHead()));
+      if (items.includes("recycle")) void Bridge.winState().then((w) => ((this.bin = w?.binItems), this.renderHead()));
+    }, 4000);
+    this.listenDrops();
     this.toolsView = new ToolsView(
       () => this.settings.tools,
       (tools) => this.change({ tools }),
@@ -391,6 +464,7 @@ export class Island {
       battery: this.battery,
       unread: this.unread,
       sys: this.sys,
+      bin: this.bin,
       day: {
         temp: w?.temp,
         icon: w ? sky(w.code, w.isDay).icon : undefined,
@@ -429,6 +503,32 @@ export class Island {
     this.slotR.replaceChildren(...(right ? [right] : []));
     // The count by the time only when the user wants notifications there.
     this.countBadge.hidden = !this.items.small.includes("notifications");
+  }
+
+  /** Files dragged over the island open the shelf; dropped, they stay there. */
+  private listenDrops() {
+    if (!IN_APP) return;
+    void import("@tauri-apps/api/webview").then(({ getCurrentWebview }) =>
+      getCurrentWebview().onDragDropEvent((e) => {
+        const p = e.payload;
+        if (p.type === "enter") {
+          this.deskView.tab = "shelf";
+          if (this.shownPage === "desk") this.shownPage = null;
+          this.dispatch({ type: "open", page: "desk" });
+        } else if (p.type === "drop" && p.paths.length) {
+          this.addToShelf(p.paths);
+        }
+      }),
+    );
+  }
+
+  /** Files on the shelf (the page's console can call it too). */
+  addToShelf(paths: string[]) {
+    this.shelf = addToShelf(this.shelf, paths, Date.now());
+    saveJson("manga.shelf", this.shelf);
+    this.kumo.flash("happy", 1.4);
+    this.deskView.tab = "shelf";
+    if (this.shownPage === "desk") this.deskView.paint();
   }
 
   dispatch(e: IslandEvent) {
@@ -742,7 +842,7 @@ export class Island {
       return { ...box, width, height: Math.max(this.hud.el.offsetHeight, 96), radius: Math.round(24 * k) };
     }
     if (this.hud.current && s.size !== "extended") {
-      if (this.hud.current.kind === "lock") {
+      if (this.hud.current.kind === "lock" || this.hud.current.kind === "keyboard") {
         return { ...box, width: Math.max(box.width, Math.round(280 * k)), height: Math.max(box.height, Math.round(36 * k)) };
       }
       const width = Math.max(box.width, Math.round(NOTICE_WIDTH * k));
@@ -802,6 +902,7 @@ export class Island {
     if (open !== this.shownPage) {
       if (this.shownPage === "controls") this.controlsView.close();
       if (this.shownPage === "system") this.systemView.close();
+      if (this.shownPage === "desk") this.deskView.close();
       this.shownPage = open;
       this.renderPage(page);
     }
@@ -836,6 +937,35 @@ export class Island {
         }
         if (id === "waves") {
           if (this.media?.playing) this.headItems.append(this.wavesHead.el);
+          continue;
+        }
+        if (id === "keyboard") {
+          const kb = this.keyboard;
+          const cur = kb?.layouts.find((l) => l.id === kb.current);
+          if (!kb || kb.layouts.length < 2 || !cur) continue;
+          const b = el("button", "head-kb", cur.short);
+          b.title = `${cur.name} — ${t("click to switch")}`;
+          b.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const n = nextLayout(kb.layouts, kb.current);
+            if (n) void Bridge.keyboardSet(n.id);
+          });
+          this.headItems.append(b);
+          continue;
+        }
+        if (id === "taskbar") {
+          const row = el("span", "head-apps");
+          for (const a of this.openApps.slice(0, 8)) {
+            const b = el("button", `head-app${a.active ? " on" : ""}`);
+            b.title = a.title;
+            b.append(appIcon(a.exe, (a.app[0] ?? "?").toUpperCase()));
+            b.addEventListener("click", (e) => {
+              e.stopPropagation();
+              void Bridge.appWindow(a.id, "activate");
+            });
+            row.append(b);
+          }
+          if (this.openApps.length) this.headItems.append(row);
           continue;
         }
         const v = itemView(id, now, ctx);
@@ -916,6 +1046,11 @@ export class Island {
     if (page.id === "notes") {
       this.notesView.paint();
       this.page.append(this.notesView.el);
+      return;
+    }
+    if (page.id === "desk") {
+      this.page.append(this.deskView.el);
+      void this.deskView.open();
       return;
     }
     if (page.id === "system") {

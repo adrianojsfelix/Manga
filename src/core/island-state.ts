@@ -8,7 +8,7 @@
 
 import type { IslandSize } from "./geometry.ts";
 
-export type Page = "home" | "assistant" | "media" | "focus" | "controls" | "notes" | "settings" | "inbox" | "system" | "tools" | "today";
+export type Page = "home" | "assistant" | "media" | "focus" | "controls" | "notes" | "settings" | "inbox" | "system" | "tools" | "today" | "desk";
 
 export interface IslandState {
   size: IslandSize;

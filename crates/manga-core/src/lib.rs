@@ -11,3 +11,4 @@ pub mod media;
 pub mod downloads;
 pub mod png;
 pub mod sysinfo;
+pub mod desk;

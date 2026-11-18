@@ -995,3 +995,51 @@ body.browser {
 .task-due { flex: 0 0 136px !important; }
 .hud.water { padding: 12px 18px 14px 10px; }
 .t-day > span:last-child { white-space: nowrap; font-size: 10.5px; }
+
+/* The Windows page. */
+.desk { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.desk .f-tabs { align-items: center; gap: 4px; }
+.desk-body { flex: 1 1 auto; min-height: 0; display: flex; gap: 12px; }
+.desk-apps { flex: 1 1 auto; min-width: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.15) transparent; }
+.desk-app { display: flex; align-items: center; gap: 2px; border-radius: 10px; }
+.desk-app:hover { background: rgba(255, 255, 255, 0.05); }
+.desk-app.active { background: rgba(255, 255, 255, 0.09); }
+.desk-app.min .desk-app-text { color: var(--dim); }
+.desk-app-main { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 9px; padding: 5px 8px; border: 0; background: transparent; color: var(--ink); text-align: left; font: 12.5px var(--font); }
+.desk-app-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.desk-icon { flex: 0 0 auto; width: 20px; height: 20px; border-radius: 5px; display: grid; place-items: center; background: rgba(255, 255, 255, 0.1) center / contain no-repeat; font: 700 10px var(--font); color: var(--dim); }
+.desk-icon[style*="background-image"] { background-color: transparent; }
+.desk-icon.big { width: 30px; height: 30px; border-radius: 7px; font-size: 10.5px; }
+.desk-pins { flex: 0 0 250px; display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border-radius: 14px; background: rgba(255, 255, 255, 0.04); overflow-y: auto; }
+.desk-pin-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.desk-pin { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 2px; border: 0; border-radius: 10px; background: transparent; color: var(--dim); font: 10.5px var(--font); }
+.desk-pin:hover { background: rgba(255, 255, 255, 0.08); color: var(--ink); }
+.desk-pin span:last-child { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.clips { flex: 1 1 auto; min-width: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.15) transparent; }
+.cb-item { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border: 0; border-radius: 10px; background: rgba(255, 255, 255, 0.04); color: var(--ink); text-align: left; font: 12.5px var(--font); }
+.cb-item:hover { background: rgba(255, 255, 255, 0.09); }
+.clip-text { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.clip-when { flex: 0 0 auto; font-size: 10.5px; color: var(--dim-2); }
+.clip-img { flex: 0 0 auto; width: 56px; height: 36px; border-radius: 6px; background: #1b1726 center / cover; }
+.shelf { flex: 1 1 auto; min-width: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); grid-auto-rows: min-content; gap: 6px; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.15) transparent; }
+.shelf-empty { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 26px 12px; border: 1.5px dashed rgba(255, 255, 255, 0.16); border-radius: 16px; color: var(--dim); text-align: center; }
+.shelf-empty b { color: var(--ink); font-size: 14px; }
+.shelf-empty span { font-size: 12px; max-width: 360px; }
+.shelf-item { display: flex; flex-direction: column; border-radius: 12px; background: rgba(255, 255, 255, 0.05); overflow: hidden; }
+.shelf-open { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 10px 6px 4px; border: 0; background: transparent; color: var(--ink); font: 11.5px var(--font); }
+.shelf-name { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shelf-acts { display: flex; justify-content: center; }
+.desk-kb { flex: 1 1 auto; }
+.desk-bin { flex: 0 0 240px; }
+.desk-bin p { margin: 0; font-size: 13px; }
+.desk-bin .f-row { margin-top: auto; gap: 6px; }
+
+/* The bar's keyboard and open apps. */
+.head-kb { border: 1px solid rgba(255, 255, 255, 0.25); background: transparent; color: #d8d2c8; font: 600 10px var(--font); letter-spacing: 0.06em; padding: 1px 5px; border-radius: 4px; }
+.head-kb:hover { background: rgba(255, 255, 255, 0.1); }
+.head-apps { display: flex; gap: 2px; }
+.head-app { width: 22px; height: 22px; display: grid; place-items: center; border: 0; border-radius: 6px; background: transparent; padding: 0; }
+.head-app:hover, .head-app.on { background: rgba(255, 255, 255, 0.12); }
+.head-app-icon { width: 15px; height: 15px; border-radius: 3px; background: rgba(255, 255, 255, 0.15) center / contain no-repeat; font: 700 8.5px/15px var(--font); color: #ddd; text-align: center; letter-spacing: 0; }
+.head-app-icon[style*="background-image"] { background-color: transparent; }
+.hud.keyboard .hud-lock { width: auto; padding: 0 6px; font: 700 11px var(--font); }

@@ -43,8 +43,15 @@ pub fn downloads_folder() -> String {
 /// An app's icon (by its AppUserModelID), as a data: URL.
 #[tauri::command]
 pub async fn app_icon(aumid: String) -> Option<String> {
-    tauri::async_runtime::spawn_blocking(move || imp::icon(&aumid)).await.ok().flatten()
+    tauri::async_runtime::spawn_blocking(move || imp::icon(&format!("shell:AppsFolder\\{aumid}"))).await.ok().flatten()
 }
+
+/// A file's (or program's, or shortcut's) icon, as a data: URL.
+#[tauri::command]
+pub async fn file_icon(path: String) -> Option<String> {
+    tauri::async_runtime::spawn_blocking(move || imp::icon(&path)).await.ok().flatten()
+}
+
 
 static NEXT: AtomicU64 = AtomicU64::new(1);
 
@@ -266,8 +273,9 @@ mod imp {
 
     static ICONS: Mutex<Option<HashMap<String, Option<String>>>> = Mutex::new(None);
 
+    /// `name`: anything the shell parses (a path, "shell:AppsFolder\\<aumid>").
     pub fn icon(aumid: &str) -> Option<String> {
-        if aumid.is_empty() {
+        if aumid.is_empty() || aumid.ends_with('\\') {
             return None;
         }
         if let Some(hit) = ICONS.lock().unwrap().get_or_insert_with(HashMap::new).get(aumid) {
@@ -282,7 +290,7 @@ mod imp {
         const N: i32 = 48;
         unsafe {
             let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
-            let item: IShellItemImageFactory = SHCreateItemFromParsingName(&HSTRING::from(format!("shell:AppsFolder\\{aumid}")), None).ok()?;
+            let item: IShellItemImageFactory = SHCreateItemFromParsingName(&HSTRING::from(aumid), None).ok()?;
             let bmp = item.GetImage(SIZE { cx: N, cy: N }, SIIGBF_ICONONLY).ok()?;
             let mut info = BITMAPINFO::default();
             info.bmiHeader = BITMAPINFOHEADER {
