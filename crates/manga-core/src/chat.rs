@@ -17,12 +17,38 @@ pub const SYSTEM: &str = "Você é o Manga, o assistente que mora numa ilha no t
 Responda em português do Brasil (ou na língua da pessoa), de forma curta e direta, como numa conversa: \
 a ilha é pequena, então prefira poucas frases e listas curtas, e use Markdown só quando ajudar.";
 
+/// What Manga can do for the person: the AI writes an action on a line of
+/// its own and the island does it (src/assistant/actions.ts reads them).
+pub const ACTIONS: &str = "Você pode agir no Manga: quando a pessoa pedir algo que ele faz, escreva a ação numa linha só, \
+no formato [[acao {json}]], e confirme numa frase curta. Ações:
+[[acao {\"tipo\":\"tarefa\",\"texto\":\"...\",\"data\":\"AAAA-MM-DD\"}]] cria uma tarefa (data opcional);
+[[acao {\"tipo\":\"pomodoro\"}]] começa um foco (opcional \"minutos\");
+[[acao {\"tipo\":\"timer\",\"minutos\":10}]] começa um timer;
+[[acao {\"tipo\":\"alarme\",\"hora\":\"HH:MM\",\"nome\":\"...\"}]] cria um alarme;
+[[acao {\"tipo\":\"lembrete\",\"hora\":\"HH:MM\",\"texto\":\"...\"}]] lembra a pessoa num horário de hoje;
+[[acao {\"tipo\":\"musica\",\"estilo\":\"beats\"}]] toca música (beats, chill, jazz, night, bossa, rain, storm, city, forest, sea, brown ou parar);
+[[acao {\"tipo\":\"nota\",\"texto\":\"...\"}]] guarda uma nota;
+[[acao {\"tipo\":\"agua\"}]] conta um copo d'água;
+[[acao {\"tipo\":\"abrir\",\"pagina\":\"hoje\"}]] abre uma página (hoje, foco, midia, notas, controles).
+Não invente ações que a pessoa não pediu.";
+
+/// The system prompt: Manga's character, what he can do, and (when the
+/// person lets him) what is going on in their day now.
+pub fn system(context: &str) -> String {
+    let mut s = format!("{SYSTEM}\n\n{ACTIONS}");
+    if !context.trim().is_empty() {
+        s.push_str("\n\nO que está acontecendo agora (use quando ajudar a responder):\n");
+        s.push_str(context.trim());
+    }
+    s
+}
+
 pub const CLAUDE_URL: &str = "https://api.anthropic.com/v1/messages";
 pub const CLAUDE_MODEL: &str = "claude-opus-5-5";
 
 /// The Messages API request: streamed, Kumo's system prompt, and the
 /// server-side fallback so a declined request is answered by another model.
-pub fn claude_body(model: &str, turns: &[Turn]) -> Value {
+pub fn claude_body(model: &str, turns: &[Turn], context: &str) -> Value {
     let messages: Vec<Value> = turns
         .iter()
         .filter(|t| !t.text.trim().is_empty())
@@ -32,7 +58,7 @@ pub fn claude_body(model: &str, turns: &[Turn]) -> Value {
         "model": model,
         "max_tokens": 16000,
         "stream": true,
-        "system": SYSTEM,
+        "system": system(context),
         "fallbacks": "default",
         "messages": messages,
     })
@@ -72,13 +98,13 @@ pub fn gemini_url(model: &str) -> String {
     format!("https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse")
 }
 
-pub fn gemini_body(turns: &[Turn]) -> Value {
+pub fn gemini_body(turns: &[Turn], context: &str) -> Value {
     let contents: Vec<Value> = turns
         .iter()
         .filter(|t| !t.text.trim().is_empty())
         .map(|t| json!({ "role": if t.role == "assistant" { "model" } else { "user" }, "parts": [{ "text": t.text }] }))
         .collect();
-    json!({ "systemInstruction": { "parts": [{ "text": SYSTEM }] }, "contents": contents })
+    json!({ "systemInstruction": { "parts": [{ "text": system(context) }] }, "contents": contents })
 }
 
 /// The text in one event of Gemini's stream (each carries the next piece).
@@ -101,8 +127,8 @@ pub fn gemini_piece(data: &str) -> Piece {
 
 /// The whole conversation as one prompt, for a command-line AI (Claude Code,
 /// Gemini CLI) that takes a single question.
-pub fn transcript(turns: &[Turn]) -> String {
-    let mut out = format!("{SYSTEM}\n\n");
+pub fn transcript(turns: &[Turn], context: &str) -> String {
+    let mut out = format!("{}\n\n", system(context));
     let last = turns.len().saturating_sub(1);
     for (i, t) in turns.iter().enumerate() {
         if i == last && t.role == "user" {
@@ -113,6 +139,20 @@ pub fn transcript(turns: &[Turn]) -> String {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod context_tests {
+    use super::*;
+
+    #[test]
+    fn the_day_goes_in_the_system_prompt_only_when_given() {
+        assert!(system("").contains("[[acao"));
+        assert!(!system("").contains("acontecendo agora"));
+        let s = system("Hoje: terça. Tarefas: relatório.");
+        assert!(s.starts_with(SYSTEM));
+        assert!(s.ends_with("Hoje: terça. Tarefas: relatório."));
+    }
 }
 
 #[cfg(test)]
@@ -129,7 +169,7 @@ mod tests {
 
     #[test]
     fn claude_gets_the_conversation_streamed_with_a_fallback() {
-        let b = claude_body(CLAUDE_MODEL, &turns());
+        let b = claude_body(CLAUDE_MODEL, &turns(), "");
         assert_eq!(b["model"], "claude-opus-5-5");
         assert_eq!(b["stream"], true);
         assert_eq!(b["fallbacks"], "default");
@@ -152,7 +192,7 @@ mod tests {
 
     #[test]
     fn gemini_gets_model_turns_and_streams_text() {
-        let b = gemini_body(&turns());
+        let b = gemini_body(&turns(), "");
         assert_eq!(b["contents"][1]["role"], "model");
         assert!(gemini_url("gemini-2.5-flash").ends_with("gemini-2.5-flash:streamGenerateContent?alt=sse"));
         assert_eq!(gemini_piece(r#"{"candidates":[{"content":{"parts":[{"text":"Olá"},{"text":"!"}]}}]}"#), Piece::Text("Olá!".into()));
@@ -162,7 +202,7 @@ mod tests {
 
     #[test]
     fn a_command_line_ai_reads_the_conversation_as_one_prompt() {
-        let p = transcript(&turns());
+        let p = transcript(&turns(), "");
         assert!(p.contains("Pessoa: Oi\nManga: Olá!\nPergunta: Que horas são em Tóquio?"));
     }
 }

@@ -34,6 +34,12 @@ import { clock as focusClock, shown as focusShown } from "../focus/timer.ts";
 import { playTone } from "../focus/tones.ts";
 import { I } from "./icons.ts";
 import { background, inkOn } from "../core/look.ts";
+import { Speaker } from "../voice/speaker.ts";
+import { STATIONS } from "../focus/lofi.ts";
+import { dayContext } from "../assistant/context.ts";
+import type { Action } from "../assistant/actions.ts";
+import { remark, restMood } from "../mascot/reactions.ts";
+import { progress as focusProgress } from "../focus/timer.ts";
 import { SettingsView } from "../settings/settings-view.ts";
 import { SystemView } from "../sysinfo/system-view.ts";
 import { ToolsView } from "../tools/tools-view.ts";
@@ -167,6 +173,12 @@ export class Island {
   private homeFace = new Canvas(150, 150, "home-manga", (x) => this.kumo.draw(x, 150, 150, 92));
   private sys: ItemContext["sys"] = null;
   private liveOn = false;
+  readonly speaker: Speaker;
+  private focusLine = el("span", "focus-line");
+  /** While focusing (focus mode), notifications wait for the break. */
+  private focusQuiet = false;
+  private heldDuringFocus = 0;
+  private lastRestMood: string = "idle";
   private systemView = new SystemView((s) => {
     this.sys = s;
   });
@@ -226,7 +238,14 @@ export class Island {
 
     const hold = (why: string) => (onIt: boolean) => this.hold(why, onIt);
     const change = (p: Partial<Settings>) => this.change(p);
-    this.chat = new ChatView(this.kumo, () => this.settings, change, hold("chat"));
+    this.speaker = new Speaker(() => this.settings.voice, this.kumo);
+    this.chat = new ChatView(this.kumo, () => this.settings, change, hold("chat"), {
+      context: () => this.dayContext(),
+      act: (a) => this.runAction(a),
+      say: (text) => {
+        if (this.settings.voice.replies) void this.speaker.say(text);
+      },
+    });
     this.ask = new AskView(() => this.render(), hold("ask"));
     this.mediaView = new MediaView(() => ({ m: this.media, readAt: this.mediaReadAt }));
     this.controlsView = new ControlsView(
@@ -259,6 +278,7 @@ export class Island {
       },
       hold("focus"),
       (p) => this.change({ focus: { ...this.settings.focus, prefs: { ...this.settings.focus.prefs, ...p } } }),
+      () => this.day.tasks.filter((x) => !x.done).map((x) => ({ id: x.id, text: x.text })),
     );
     this.focus.onChange(() => {
       if (this.shownPage === "home") this.shownPage = null;
@@ -278,6 +298,7 @@ export class Island {
       () => {
         const w = this.day.waterNow;
         this.kumo.flash("happy", 2);
+        if (this.settings.voice.alerts) void this.speaker.say(t("Time for some water!"));
         this.hud.show({
           kind: "water",
           text: t("{ml} ml of {goal} ml today.", { ml: w.ml, goal: this.settings.day.water.goal }),
@@ -336,6 +357,15 @@ export class Island {
       if (items.includes("recycle")) void Bridge.winState().then((w) => ((this.bin = w?.binItems), this.renderHead()));
     }, 4000);
     this.listenDrops();
+    this.focus.hooks = {
+      taskName: (id) => this.day.tasks.find((x) => x.id === id)?.text ?? null,
+      taskDone: (id) => {
+        if (this.day.tasks.some((x) => x.id === id && !x.done)) this.day.toggleTask(id);
+      },
+      focusing: (on) => this.focusMode(on),
+    };
+    window.setInterval(() => void this.react(), 30_000);
+    window.setTimeout(() => void this.react(), 3000);
     // Full screen: the island steps aside (if the user wants it so).
     on<boolean>("fullscreen", (full) => {
       this.fullscreen = full;
@@ -356,6 +386,7 @@ export class Island {
       const wants = this.items.medium.concat(this.items.small).some((i) => i === "cpu" || i === "ram" || i === "net");
       if (wants && this.shownPage !== "system" && this.state.size !== "small") void this.systemView.read().then(() => this.renderHead());
     }, 3000);
+    this.settingsView.speaker = this.speaker;
     this.banner = new Banner(
       this.kumo,
       () => this.settings.notifications.seconds,
@@ -406,6 +437,7 @@ export class Island {
     body.append(this.page, this.dock);
     this.clip.append(this.smallFace, head, this.banner.el, body, this.hud.el, this.ask.el);
     this.shell.append(this.earL, this.earR, this.clip);
+    this.clip.append(this.focusLine);
     root.append(this.shell);
 
     this.shell.addEventListener("mouseenter", () => {
@@ -541,6 +573,115 @@ export class Island {
     }
   }
 
+  /** The day in a few lines, for the AI (only when the person lets Manga share it). */
+  private dayContext(): string {
+    const w = this.day.weather;
+    const f = this.focus.state;
+    const task = this.focus.task ? this.day.tasks.find((x) => x.id === this.focus.task)?.text ?? null : null;
+    return dayContext({
+      now: new Date(),
+      lang: language(),
+      weather: w && this.settings.day.place ? { temp: w.temp, sky: t(sky(w.code, w.isDay).label), place: this.settings.day.place.name } : null,
+      events: this.day.upcoming(3, 6).map((o) => ({ title: o.title, when: when(o) })),
+      tasks: this.day.tasks.filter((x) => !x.done).map((x) => ({ text: x.text, due: x.due })),
+      focus: { phase: phaseName(f.phase), running: f.running, left: focusClock(focusShown(f, Date.now())), task },
+      water: this.settings.day.water.on ? { ml: this.day.waterNow.ml, goal: this.settings.day.water.goal } : null,
+      playing: this.media ? { title: this.media.title, app: this.media.app } : null,
+      unread: this.unread,
+      lastNotices: this.recent.slice(0, 3).map((n) => ({ app: n.app, title: n.title })),
+    });
+  }
+
+  /** Does what Manga was asked in the chat; answers what was done, for the chat to show. */
+  private runAction(a: Action): string | null {
+    switch (a.kind) {
+      case "task":
+        this.day.addTask(a.text, a.date);
+        return t("Task added: {text}", { text: a.text });
+      case "pomodoro":
+        if (a.minutes) this.change({ focus: { ...this.settings.focus, prefs: { ...this.settings.focus.prefs, focus: a.minutes } } });
+        this.focus.setMode("pomodoro");
+        if (!this.focus.state.running) this.focus.toggle();
+        return t("Focus started");
+      case "timer":
+        this.focus.timer(a.minutes);
+        return t("Timer of {n} min started", { n: a.minutes });
+      case "alarm":
+      case "reminder":
+        this.focus.addAlarm({ id: String(Date.now()), time: a.time, days: [], label: a.kind === "alarm" ? a.label : a.text, tone: this.settings.focus.tone, on: true });
+        return a.kind === "alarm" ? t("Alarm at {time}", { time: a.time }) : t("Reminder at {time}", { time: a.time });
+      case "music":
+        if (a.station === "stop") {
+          this.focus.stopMusic();
+          return t("Music stopped");
+        }
+        this.focus.playMusic({ kind: "station", id: a.station });
+        return t("Playing {name}", { name: t(STATIONS.find((x) => x.id === a.station)?.name ?? a.station) });
+      case "note": {
+        const n = this.day.addNote();
+        this.day.editNote(n.id, a.text);
+        return t("Note saved");
+      }
+      case "water":
+        this.day.drink();
+        return t("A glass of water counted");
+      case "open":
+        this.dispatch({ type: "open", page: a.page });
+        return null;
+    }
+  }
+
+  /** Focus mode: notifications wait for the break; distracting apps are minimized. */
+  private focusMode(on: boolean) {
+    const f = this.settings.focus;
+    if (on) {
+      this.focusQuiet = f.quiet;
+      this.heldDuringFocus = 0;
+      if (f.minimize.length) {
+        const want = f.minimize.map((x) => x.toLowerCase());
+        void Bridge.appsOpen().then((apps) => {
+          for (const a of apps ?? []) if (want.some((w) => a.app.toLowerCase().includes(w) || a.title.toLowerCase().includes(w))) void Bridge.appWindow(a.id, "minimize");
+        });
+      }
+      return;
+    }
+    this.focusQuiet = false;
+    if (this.heldDuringFocus > 0) {
+      const n = this.heldDuringFocus;
+      this.heldDuringFocus = 0;
+      this.notify({ id: -Date.now(), app: "Manga", title: t("While you focused"), body: t("{n} notifications are waiting in the list.", { n }), at: Date.now() });
+    }
+  }
+
+  /** Manga's mood follows what goes on; now and then he says something about it. */
+  private async react() {
+    if (this.chatBusy()) return;
+    if (IN_APP && !this.sys) this.sys = (await Bridge.sysinfo()) ?? null;
+    const w = this.day.waterNow;
+    const goal = this.settings.day.water;
+    const f = this.focus.state;
+    const mood = restMood({
+      hour: new Date().getHours(),
+      battery: this.battery ? this.battery.level : null,
+      charging: this.battery?.charging ?? false,
+      cpu: this.sys ? this.sys.cpu : null,
+      focusing: f.running && f.phase === "focus",
+      onBreak: f.running && (f.phase === "short" || f.phase === "long"),
+      goalReached: goal.on && w.ml >= goal.goal,
+    });
+    const line = remark(this.lastRestMood as never, mood);
+    this.lastRestMood = mood;
+    this.kumo.setMood(mood);
+    if (line && this.settings.remarks) {
+      this.hud.show({ kind: "say", text: line });
+      if (this.settings.voice.alerts) void this.speaker.say(line);
+    }
+  }
+
+  private chatBusy(): boolean {
+    return ["thinking", "working", "happy", "sad", "surprised"].includes(this.kumo.mood) && this.state.page === "assistant" && this.state.size === "extended";
+  }
+
   /** Files dragged over the island open the shelf; dropped, they stay there. */
   private listenDrops() {
     if (!IN_APP) return;
@@ -593,9 +734,10 @@ export class Island {
     const s = this.settings.notifications;
     if (!s.on || !shows(n, s.ignored)) return;
     this.recent = remember(this.recent, n);
-    if (s.quiet) {
-      // Do not disturb: in the list, quietly.
+    if (s.quiet || this.focusQuiet) {
+      // Do not disturb (or focusing): in the list, quietly.
       this.unread++;
+      if (this.focusQuiet) this.heldDuringFocus++;
       this.renderHead();
       return;
     }
@@ -648,6 +790,7 @@ export class Island {
   private ringAlarm(r: Ring) {
     const f = this.settings.focus;
     this.kumo.flash(f.alert.mood, 4);
+    if (this.settings.voice.alerts) window.setTimeout(() => void this.speaker.say(`${r.title} ${r.body}`), 1200);
     const data = { ...r, volume: f.volume, mood: f.alert.mood, color: f.alert.color, repeat: f.alert.repeat };
     if (IN_APP && f.alert.place !== "island") {
       void Bridge.popupOpen("alert", data, 460, 220, f.alert.place === "top" ? "top" : "center");
@@ -1203,8 +1346,14 @@ export class Island {
       }
       if (this.state.size === "extended" && this.state.page === "media") this.mediaView.frame();
       if (this.state.size === "extended" && this.state.page === "focus") this.focusView.frame();
-      if (this.hud.current?.kind === "ring" || this.hud.current?.kind === "water") this.ringFace.draw();
+      if (this.hud.current?.kind === "ring" || this.hud.current?.kind === "water" || this.hud.current?.kind === "say") this.ringFace.draw();
       const fs = this.focus.state;
+      // The focus line along the bottom of the island fills as the phase goes.
+      this.focusLine.classList.toggle("on", fs.running && fs.mode !== "stopwatch");
+      if (fs.running) {
+        this.focusLine.style.width = `${focusProgress(fs, Date.now()) * 100}%`;
+        this.focusLine.dataset.phase = fs.phase;
+      }
       if (fs.running) {
         const txt = focusClock(focusShown(fs, Date.now()));
         if (this.countdown.textContent !== txt) this.countdown.textContent = txt;

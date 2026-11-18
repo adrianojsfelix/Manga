@@ -27,6 +27,8 @@ export interface ChatRequest {
   mode: Mode;
   model: string | null;
   turns: { role: "user" | "assistant"; text: string }[];
+  /** The day, for the AI (empty when the person turned it off). */
+  context: string;
 }
 
 export const Bridge = {
@@ -79,6 +81,9 @@ export const Bridge = {
   fetchText: (url: string) => invokeOrError<string>("fetch_text", { url }),
   /** The user's Pinterest (logged in) in a window of its own; `path` inside the site. */
   pinterestOpen: (path?: string) => invokeOrError<void>("pinterest_open", { path: path ?? null }),
+  /** Speech from the voice server on this PC, as a data: URL. */
+  voiceSpeak: (base: string, voice: string, model: string, text: string) => invokeOrError<string>("voice_speak", { base, voice, model, text }),
+  voiceList: (base: string) => invokeOrError<string[]>("voice_list", { base }),
   fileIcon: (path: string) => call<string | null>("file_icon", { path }),
   keyboardGet: () => call<Keyboard>("keyboard_get"),
   keyboardSet: (id: number) => call<boolean>("keyboard_set", { id }),

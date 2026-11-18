@@ -15,10 +15,11 @@ import { TONES, playTone } from "../focus/tones.ts";
 import { DOCK_PAGES } from "../core/settings.ts";
 import { geocodeUrl, parsePlaces, type Place } from "../day/weather.ts";
 import { saveProfile, type LookPrefs, type Profile } from "../core/look.ts";
+import { Speaker } from "../voice/speaker.ts";
 import type { Page } from "../core/island-state.ts";
 import { BUILT_PHASE, ITEMS, type ItemId, type ItemPrefs } from "../items/registry.ts";
 
-type Tab = "assistant" | "claude" | "focus" | "day" | "notifications" | "island" | "look" | "about";
+type Tab = "assistant" | "voice" | "claude" | "focus" | "day" | "notifications" | "island" | "look" | "about";
 
 const SECRET: Record<Provider, SecretName> = { claude: "anthropic", gemini: "gemini" };
 const AI: { id: Provider; name: string; keyHint: string; model: string; cli: string }[] = [
@@ -58,7 +59,7 @@ export class SettingsView {
 
   paint() {
     const tabs = el("div", "set-tabs");
-    for (const [id, label] of [["assistant", "Assistant"], ["claude", "Claude Code"], ["focus", "Focus"], ["day", "The day"], ["notifications", "Notifications"], ["island", "Island"], ["look", "Appearance"], ["about", "About"]] as [Tab, string][]) {
+    for (const [id, label] of [["assistant", "Assistant"], ["voice", "Voice"], ["claude", "Claude Code"], ["focus", "Focus"], ["day", "The day"], ["notifications", "Notifications"], ["island", "Island"], ["look", "Appearance"], ["about", "About"]] as [Tab, string][]) {
       const b = el("button", `set-tab${this.tab === id ? " on" : ""}`, t(label));
       b.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -72,6 +73,7 @@ export class SettingsView {
     else if (this.tab === "claude") this.claudeCode(body);
     else if (this.tab === "focus") this.focus(body);
     else if (this.tab === "day") this.dayTab(body);
+    else if (this.tab === "voice") this.voiceTab(body);
     else if (this.tab === "look") this.lookTab(body);
     else if (this.tab === "about") this.aboutTab(body);
     else if (this.tab === "notifications") this.notifications(body);
@@ -101,6 +103,12 @@ export class SettingsView {
 
   private assistant(body: HTMLElement) {
     const s = this.settings();
+    const day = el("div", "set-box");
+    day.append(
+      this.row(t("Share my day with Manga"), this.segmented(s.context ? "on" : "off", [["on", t("On")], ["off", t("Off")]], (v) => this.change({ context: v === "on" }))),
+      el("p", "set-note", t("With each question, the AI also gets a short summary: the time, the weather, your next events and tasks, the focus and the last notifications. That is how Manga answers “what do I have today?”. It goes only to the AI you chose, only when you ask.")),
+    );
+    body.append(day);
     for (const a of AI) {
       const prefs = s.ai[a.id];
       const box = el("div", "set-box");
@@ -157,6 +165,33 @@ export class SettingsView {
   }
 
   private audio: AudioContext | null = null;
+  private appInput = el("input", "set-input");
+
+  /** A list of app names (chips with ×) and a field to add one. */
+  private appList(list: string[], set: (l: string[]) => void) {
+    const box = el("div", "set-chips");
+    for (const a of list) {
+      const c = el("button", "chip on", `${a} ×`);
+      c.addEventListener("click", (e) => {
+        e.stopPropagation();
+        set(list.filter((x) => x !== a));
+        this.paint();
+      });
+      box.append(c);
+    }
+    this.appInput.placeholder = t("An app (Discord, WhatsApp…)");
+    typing(this.appInput, this.hold);
+    this.appInput.onkeydown = (e) => {
+      const v = this.appInput.value.trim();
+      if (e.key === "Enter" && v) {
+        set([...list, v]);
+        this.appInput.value = "";
+        this.paint();
+      }
+    };
+    box.append(this.appInput);
+    return box;
+  }
 
   private number(value: number, min: number, max: number, set: (v: number) => void, unit = "min") {
     const wrap = el("span", "set-num");
@@ -196,6 +231,8 @@ export class SettingsView {
       this.row(t("Rest screen in breaks"), onOff(f.rest, (v) => setF({ rest: v }))),
       this.row(t("Allow skipping the rest"), onOff(f.restSkip, (v) => setF({ restSkip: v }))),
       this.row(t("Music only while focusing"), onOff(f.withFocus, (v) => setF({ withFocus: v }))),
+      this.row(t("Notifications wait for the break"), onOff(f.quiet, (v) => setF({ quiet: v }))),
+      this.row(t("Minimize while focusing"), this.appList(f.minimize, (minimize) => setF({ minimize }))),
     );
     body.append(times);
 
@@ -491,6 +528,103 @@ export class SettingsView {
     }
     body.append(up);
   }
+
+  private studioVoices: string[] = [];
+  private voiceNote = "";
+  private studioVoice = el("input", "set-input");
+  private studioModel = el("input", "set-input");
+  private studioUrl = el("input", "set-input");
+
+  private voiceTab(body: HTMLElement) {
+    const s = this.settings();
+    const v = s.voice;
+    const setV = (p: Partial<typeof v>) => this.change({ voice: { ...v, ...p } });
+    const onOff = (x: boolean, set: (b: boolean) => void) => this.segmented(x ? "on" : "off", [["on", t("On")], ["off", t("Off")]], (y) => set(y === "on"));
+    const test = el("button", "set-btn", t("Hear it"));
+    test.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      this.voiceNote = (await this.speaker?.say(t("Hi! I'm {name}. Shall we focus for a bit?", { name: "Manga" }), true)) ?? "";
+      this.paint();
+    });
+
+    const box = el("div", "set-box");
+    box.append(el("div", "set-title", t("Manga's voice")));
+    box.append(
+      this.row(t("Manga speaks"), onOff(v.on, (on) => setV({ on }))),
+      this.row(t("Voice"), this.segmented(v.gender, [["female", t("Female")], ["male", t("Male")]], (gender) => setV({ gender, windowsVoice: "" }))),
+      this.row(t("From"), this.segmented(v.engine, [["windows", t("Windows' voices")], ["studio", "Voice Studio"]], (engine) => setV({ engine }))),
+    );
+    if (v.engine === "windows") {
+      const voices = Speaker.voices();
+      const pick = el("select", "set-input");
+      pick.append(new Option(t("The best for the choice above"), ""));
+      for (const x of voices) pick.append(new Option(`${x.name} (${x.lang})`, x.name));
+      pick.value = v.windowsVoice;
+      pick.addEventListener("change", () => setV({ windowsVoice: pick.value }));
+      box.append(this.row(t("Windows voice"), pick));
+      if (!voices.length) box.append(el("p", "set-note", t("No Windows voices found. Add Portuguese voices in Windows Settings → Time & language → Speech.")));
+    } else {
+      this.studioUrl.value = v.studioUrl;
+      this.studioUrl.placeholder = "http://127.0.0.1:3900";
+      this.studioVoice.value = v.studioVoice;
+      this.studioVoice.placeholder = t("The voice's name in Voice Studio");
+      this.studioModel.value = v.studioModel;
+      this.studioModel.placeholder = t("Model (optional)");
+      for (const f of [this.studioUrl, this.studioVoice, this.studioModel]) typing(f, this.hold);
+      this.studioUrl.onchange = () => setV({ studioUrl: this.studioUrl.value.trim() });
+      this.studioVoice.onchange = () => setV({ studioVoice: this.studioVoice.value.trim() });
+      this.studioModel.onchange = () => setV({ studioModel: this.studioModel.value.trim() });
+      const list = el("button", "set-btn quiet", t("List voices"));
+      list.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const r = await Bridge.voiceList(v.studioUrl);
+        if ("error" in r) this.voiceNote = r.error;
+        else {
+          this.studioVoices = r.ok;
+          this.voiceNote = "";
+        }
+        this.paint();
+      });
+      box.append(this.row(t("Address"), this.studioUrl), this.row(t("Voice"), this.studioVoice, list), this.row(t("Model"), this.studioModel));
+      if (this.studioVoices.length) {
+        const chips = el("div", "set-chips");
+        for (const name of this.studioVoices.slice(0, 40)) {
+          const c = el("button", `chip${name === v.studioVoice ? " on" : ""}`, name);
+          c.addEventListener("click", (e) => {
+            e.stopPropagation();
+            setV({ studioVoice: name });
+            this.paint();
+          });
+          chips.append(c);
+        }
+        box.append(chips);
+      }
+      box.append(el("p", "set-note", t("Voice Studio (open source) runs on your PC and makes natural voices, even cloned or described ones. Open it, pick or create a female or male voice, and write its name here. Only this PC is used.")));
+    }
+    const rate = el("input", "set-range");
+    rate.type = "range";
+    rate.min = "0.6";
+    rate.max = "1.6";
+    rate.step = "0.1";
+    rate.value = String(v.rate);
+    rate.addEventListener("change", () => setV({ rate: Number(rate.value) }));
+    box.append(this.row(t("Speed"), rate), this.row("", test));
+    if (this.voiceNote) box.append(el("p", "set-note error", this.voiceNote));
+    body.append(box);
+
+    const what = el("div", "set-box");
+    what.append(el("div", "set-title", t("What he says")));
+    what.append(
+      this.row(t("The chat's answers"), onOff(v.replies, (replies) => setV({ replies }))),
+      this.row(t("Alarms, reminders and water"), onOff(v.alerts, (alerts) => setV({ alerts }))),
+      this.row(t("Manga comments what goes on"), onOff(s.remarks, (remarks) => this.change({ remarks }))),
+      el("p", "set-note", t("Low battery, the processor at full speed, the day's goal reached, late hours: his face changes, and now and then he says something.")),
+    );
+    body.append(what);
+  }
+
+  /** The voice, to test it here (the island gives it). */
+  speaker: Speaker | null = null;
 
   private places: Place[] = [];
   private placeError = "";

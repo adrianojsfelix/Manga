@@ -34,6 +34,7 @@ export class FocusView {
     private setVolume: (v: number) => void,
     hold: (on: boolean) => void,
     private setPrefs: (p: Partial<FocusPrefs>) => void = () => {},
+    private tasks: () => { id: string; text: string }[] = () => [],
   ) {
     this.tab = engine.state.mode;
     this.linkInput.placeholder = t("Paste a YouTube link");
@@ -142,11 +143,24 @@ export class FocusView {
     }
     left.append(phase, this.big, this.ends, track, row);
     if (s.mode === "pomodoro") {
+      // The task this focus is for.
+      const pick = el("select", "f-task");
+      pick.title = t("What this focus is for");
+      pick.addEventListener("click", (ev) => ev.stopPropagation());
+      pick.append(new Option(t("Focusing on: nothing in particular"), ""));
+      for (const task of this.tasks()) {
+        const n = e.counts[task.id] ?? 0;
+        pick.append(new Option(`${t("Focusing on")}: ${task.text}${n ? ` · ${n} 🍅` : ""}`, task.id));
+      }
+      pick.value = e.task && this.tasks().some((x) => x.id === e.task) ? e.task : "";
+      pick.addEventListener("change", () => e.setTask(pick.value || null));
+      left.insertBefore(pick, this.big);
       // The times, right here: focus, the short break, the long one.
       const p = e.settings().prefs;
       const times = el("div", "f-times");
       const time = (label: string, value: number, min: number, max: number, set: (v: number) => void) => {
         const box = el("span", "f-time-set");
+        box.dataset.label = label;
         box.append(
           el("span", "f-time-label", label),
           this.btn("M5 12h14", "−", "tiny", () => set(Math.max(min, value - (value > 10 ? 5 : 1))), 12),
@@ -158,10 +172,13 @@ export class FocusView {
       times.append(
         time(t("Focus"), p.focus, 1, 180, (v) => this.setPrefs({ focus: v })),
         time(t("Break"), p.short, 1, 60, (v) => this.setPrefs({ short: v })),
-        time(t("Long break"), p.long, 1, 120, (v) => this.setPrefs({ long: v })),
+        time(t("Long"), p.long, 1, 120, (v) => this.setPrefs({ long: v })),
         el("span", "f-time-unit", "min"),
       );
-      left.append(times);
+      // Beside the big time: the three lengths, one under the other.
+      const clockRow = el("div", "f-clock-row");
+      left.insertBefore(clockRow, this.big);
+      clockRow.append(this.big, times);
     }
   }
 

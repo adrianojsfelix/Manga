@@ -49,6 +49,8 @@ export class Kumo {
   mood: Mood = "idle";
   /** Where he looks, −1…1 each way (the pointer). */
   lookX = 0;
+  /** He is speaking (the voice is playing). */
+  talking = false;
   lookY = 0;
   private moodSince = now();
   private nextBlink = now() + 2;
@@ -115,7 +117,8 @@ export class Kumo {
     drawBody(x, R);
     drawBlush(x, R, f.blush);
     drawEyes(x, R, blinking && (f.eyes === "open" || f.eyes === "look") ? "closed" : f.eyes, this.lookX, this.lookY, t, mood);
-    drawMouth(x, R, f.mouth, t);
+    // Talking: the mouth opens and closes with the voice.
+    drawMouth(x, R, this.talking ? (Math.sin(t * 18) > -0.1 ? "open" : "smile") : f.mouth, t);
     x.restore();
 
     x.save();

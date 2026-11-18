@@ -7,6 +7,14 @@ import type { Provider, Settings } from "../core/settings.ts";
 import { Canvas, el, icon, typing } from "../island/dom.ts";
 import type { Kumo } from "../mascot/kumo.ts";
 import { EMPTY, ask, delta, done, moodOf, toSend, type Conversation } from "./conversation.ts";
+import { hidePending, readActions, type Action } from "./actions.ts";
+
+/** What the chat needs from the island: the day, doing things, a voice. */
+export interface ChatHelpers {
+  context: () => string;
+  act: (a: Action) => string | null;
+  say: (text: string) => void;
+}
 
 const SEND = "M5 12h13M13 6l6 6-6 6";
 const STOP = "M7 7h10v10H7z";
@@ -23,12 +31,15 @@ export class ChatView {
   private chips = el("div", "chat-chips");
   private c: Conversation = EMPTY;
   private calm: number | null = null;
+  /** What Manga did in each answer (by its place in the conversation). */
+  private did = new Map<number, string[]>();
 
   constructor(
     private kumo: Kumo,
     private settings: () => Settings,
     private change: (s: Partial<Settings>) => void,
     hold: (on: boolean) => void,
+    private helpers: ChatHelpers = { context: () => "", act: () => null, say: () => {} },
   ) {
     this.kumoCanvas = new Canvas(96, 110, "chat-kumo", (x) => kumo.draw(x, 96, 110, 60));
     const side = el("div", "chat-side");
@@ -97,7 +108,7 @@ export class ChatView {
     this.set(next);
     const prefs = s.ai[s.provider];
     if (IN_APP) {
-      void Bridge.chatSend({ id, provider: s.provider, mode: prefs.mode, model: prefs.model || null, turns: toSend(next) });
+      void Bridge.chatSend({ id, provider: s.provider, mode: prefs.mode, model: prefs.model || null, turns: toSend(next), context: s.context ? this.helpers.context() : "" });
     } else {
       void this.pretend(id);
     }
@@ -123,12 +134,22 @@ export class ChatView {
 
   private set(c: Conversation) {
     if (c === this.c) return;
+    const finished = this.c.pending != null && c.pending == null && (c.phase === "done" || c.phase === "refused");
     this.c = c;
+    if (finished) {
+      // The answer is in: Manga does what it asks, and says it.
+      const i = c.turns.length - 1;
+      const { clean, actions } = readActions(c.turns[i]?.text ?? "");
+      const labels = actions.map((a) => this.helpers.act(a)).filter((x): x is string => !!x);
+      if (labels.length) this.did.set(i, labels);
+      if (clean) this.helpers.say(clean);
+    }
     this.kumo.setMood(moodOf(c.phase));
     if (this.calm != null) window.clearTimeout(this.calm);
     if (c.phase === "done" || c.phase === "error" || c.phase === "refused") {
       this.calm = window.setTimeout(() => this.kumo.setMood("idle"), 3500);
     }
+    if (!c.turns.length) this.did.clear();
     this.paint();
   }
 
@@ -152,13 +173,16 @@ export class ChatView {
       hello.append(el("b", "", t("Hi! I'm {name}.", { name: "Manga" })), el("span", "", t("Ask me anything. I answer with {ai}.", { ai: NAMES[s.provider] })));
       this.list.append(hello);
     }
-    for (const turn of this.c.turns) {
+    this.c.turns.forEach((turn, i) => {
       const b = el("div", `msg ${turn.role}${turn.error ? " error" : ""}`);
-      if (turn.role === "assistant" && turn.text === "") b.append(el("span", "dots", "···"));
-      else b.textContent = turn.text;
+      // The action lines are not shown: what Manga did shows below the answer.
+      const text = turn.role === "assistant" ? readActions(hidePending(turn.text)).clean : turn.text;
+      if (turn.role === "assistant" && text === "") b.append(el("span", "dots", "···"));
+      else b.textContent = text;
       if (turn.role === "assistant" && turn.provider) b.dataset.by = NAMES[turn.provider];
       this.list.append(b);
-    }
+      for (const label of this.did.get(i) ?? []) this.list.append(el("div", "msg-did", `✓ ${label}`));
+    });
     this.list.scrollTop = this.list.scrollHeight;
     this.sendBtn.replaceChildren(icon(this.c.pending ? STOP : SEND, 15));
     this.sendBtn.title = this.c.pending ? t("Stop") : t("Send");

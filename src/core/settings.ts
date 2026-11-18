@@ -50,6 +50,11 @@ export interface Settings {
   controls: string[];
   /** The clipboard's history is kept (in memory only). */
   clipboard: boolean;
+  voice: VoicePrefs;
+  /** Manga gets a summary of the day with each question (agenda, tasks, focus…). */
+  context: boolean;
+  /** Manga comments what goes on (low battery, the goal reached…). */
+  remarks: boolean;
   look: LookPrefs;
   /** Look for a new version once a day. */
   updates: boolean;
@@ -79,6 +84,56 @@ const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object"
 export type AlertPlace = "center" | "top" | "island";
 export type AlertMood = "proud" | "happy" | "love" | "surprised" | "sleepy";
 
+export interface VoicePrefs {
+  /** Manga speaks. */
+  on: boolean;
+  /** Windows' own voices, or a speech server on this PC (VoiceStudio). */
+  engine: "windows" | "studio";
+  gender: "female" | "male";
+  /** A Windows voice by name (empty: the best for the gender). */
+  windowsVoice: string;
+  /** 0.6–1.6. */
+  rate: number;
+  studioUrl: string;
+  studioVoice: string;
+  studioModel: string;
+  /** What he says out loud: the chat's answers, the alarms and reminders. */
+  replies: boolean;
+  alerts: boolean;
+}
+
+export const DEFAULT_VOICE: VoicePrefs = {
+  on: false,
+  engine: "windows",
+  gender: "female",
+  windowsVoice: "",
+  rate: 1,
+  studioUrl: "http://127.0.0.1:3900",
+  studioVoice: "",
+  studioModel: "",
+  replies: true,
+  alerts: true,
+};
+
+export function sanitizeVoice(raw: unknown): VoicePrefs {
+  const r = obj(raw);
+  const d = DEFAULT_VOICE;
+  const s = (v: unknown, def: string, max = 120) => (typeof v === "string" ? v.trim().slice(0, max) : def);
+  const url = s(r.studioUrl, d.studioUrl);
+  return {
+    on: typeof r.on === "boolean" ? r.on : d.on,
+    engine: r.engine === "studio" ? "studio" : "windows",
+    gender: r.gender === "male" ? "male" : "female",
+    windowsVoice: s(r.windowsVoice, ""),
+    rate: typeof r.rate === "number" && Number.isFinite(r.rate) ? Math.round(Math.min(1.6, Math.max(0.6, r.rate)) * 10) / 10 : d.rate,
+    studioUrl: /^http:\/\/(127\.0\.0\.1|localhost|\[::1\]):\d{2,5}\/?$/.test(url) ? url : d.studioUrl,
+    studioVoice: s(r.studioVoice, ""),
+    studioModel: s(r.studioModel, ""),
+    replies: typeof r.replies === "boolean" ? r.replies : d.replies,
+    alerts: typeof r.alerts === "boolean" ? r.alerts : d.alerts,
+  };
+}
+
 export interface FocusSettings {
   prefs: FocusPrefs;
   /** The tone for focus, timer and new alarms. */
@@ -92,6 +147,9 @@ export interface FocusSettings {
   withFocus: boolean;
   musicVolume: number;
   alert: { place: AlertPlace; mood: AlertMood; message: string; color: string; repeat: boolean };
+  /** While focusing: notifications wait for the break; these apps are minimized. */
+  quiet: boolean;
+  minimize: string[];
 }
 
 export const DEFAULT_FOCUS: FocusSettings = {
@@ -103,6 +161,8 @@ export const DEFAULT_FOCUS: FocusSettings = {
   withFocus: true,
   musicVolume: 0.6,
   alert: { place: "center", mood: "proud", message: "", color: "#8b7cf6", repeat: true },
+  quiet: true,
+  minimize: [],
 };
 
 const MOODS: AlertMood[] = ["proud", "happy", "love", "surprised", "sleepy"];
@@ -128,6 +188,8 @@ export function sanitizeFocus(raw: unknown): FocusSettings {
       color: typeof a.color === "string" && /^#[0-9a-f]{6}$/i.test(a.color) ? a.color : d.alert.color,
       repeat: bool(a.repeat, d.alert.repeat),
     },
+    quiet: bool(r.quiet, d.quiet),
+    minimize: Array.isArray(r.minimize) ? [...new Set(r.minimize.filter((x): x is string => typeof x === "string" && x.trim() !== "").map((x) => x.trim()))].slice(0, 20) : d.minimize,
   };
 }
 
@@ -140,6 +202,9 @@ export const DEFAULT_SETTINGS: Settings = {
   island: { shape: "notch", rest: "small", scale: 1, center: "clock", dock: ["home", "assistant", "media", "focus", "controls", "desk", "system", "tools", "today"] },
   controls: DEFAULT_CONTROLS,
   clipboard: true,
+  voice: DEFAULT_VOICE,
+  context: true,
+  remarks: true,
   look: DEFAULT_LOOK,
   updates: true,
   day: { place: null, calendars: [], water: DEFAULT_WATER },
@@ -184,6 +249,9 @@ export function sanitizeSettings(raw: unknown): Settings {
     claudeCode: { ask: typeof obj(r.claudeCode).ask === "boolean" ? (obj(r.claudeCode).ask as boolean) : d.claudeCode.ask },
     controls: Array.isArray(r.controls) ? [...new Set(r.controls.filter((c): c is string => typeof c === "string"))].slice(0, 30) : d.controls,
     clipboard: typeof r.clipboard === "boolean" ? r.clipboard : d.clipboard,
+    voice: sanitizeVoice(r.voice),
+    context: typeof r.context === "boolean" ? r.context : d.context,
+    remarks: typeof r.remarks === "boolean" ? r.remarks : d.remarks,
     look: sanitizeLook(r.look),
     updates: typeof r.updates === "boolean" ? r.updates : d.updates,
     day: {

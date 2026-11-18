@@ -30,7 +30,7 @@ export interface Ring {
   body: string;
   tone: string;
   /** The buttons on the alarm's card. */
-  actions: { id: "start" | "plus5" | "snooze" | "dismiss"; label: string }[];
+  actions: { id: "start" | "plus5" | "snooze" | "dismiss" | "taskdone"; label: string }[];
 }
 
 function load(key: string): unknown {
@@ -166,23 +166,36 @@ export class FocusEngine {
     }
     const toBreak = ended === "focus";
     const started = this.state.running;
+    // The session's task: one more pomodoro for it, and the question whether it is done.
+    const task = toBreak && this.task ? this.hooks.taskName(this.task) : null;
+    if (toBreak && this.task && task) {
+      this.counts = { ...this.counts, [this.task]: (this.counts[this.task] ?? 0) + 1 };
+      keep("manga.taskPomos", this.counts);
+    }
+    let body = msg || (toBreak ? t("{phase}: {min} minutes.", { phase: phaseName(next ?? "short"), min: Math.round(this.state.length / 60000) }) : t("Round {n} of {total}.", { n: this.state.round + 1, total: this.prefs.rounds }));
+    if (task) body = `${t("“{task}”: {n} pomodoros.", { task, n: this.counts[this.task!] ?? 1 })} ${body}`;
+    const actions: Ring["actions"] = started
+      ? [{ id: "dismiss", label: t("OK") }]
+      : [
+          { id: "start", label: toBreak ? t("Start break") : t("Start focus") },
+          { id: "dismiss", label: t("Later") },
+        ];
+    if (task) actions.unshift({ id: "taskdone", label: t("I finished the task") });
     this.ring({
       kind: toBreak ? "focus" : "break",
       title: toBreak ? t("Focus done! Time to rest.") : t("Break over. Back to focus?"),
-      body: msg || (toBreak ? t("{phase}: {min} minutes.", { phase: phaseName(next ?? "short"), min: Math.round(this.state.length / 60000) }) : t("Round {n} of {total}.", { n: this.state.round + 1, total: this.prefs.rounds })),
+      body,
       tone: s.tone,
-      actions: started
-        ? [{ id: "dismiss", label: t("OK") }]
-        : [
-            { id: "start", label: toBreak ? t("Start break") : t("Start focus") },
-            { id: "dismiss", label: t("Later") },
-          ],
+      actions,
     });
   }
 
   /** The alarm card's buttons. */
   act(id: string) {
-    if (id === "start" && !this.state.running) this.toggle();
+    if (id === "taskdone" && this.task) {
+      this.hooks.taskDone(this.task);
+      this.setTask(null);
+    } else if (id === "start" && !this.state.running) this.toggle();
     else if (id === "plus5") this.timer(5);
     else if (id === "snooze") {
       const at = new Date(Date.now() + 5 * 60_000);
@@ -191,9 +204,34 @@ export class FocusEngine {
     }
   }
 
+  // ——— the session's task ———
+
+  /** The task this focus is for (a task's id), or null. */
+  task: string | null = (load("manga.focusTask") as string | null) ?? null;
+  /** Pomodoros done for each task. */
+  counts: Record<string, number> = (load("manga.taskPomos") as Record<string, number> | null) ?? {};
+  /** What the island tells the engine (the tasks live in the day's store). */
+  hooks = {
+    taskName: (_id: string): string | null => null,
+    taskDone: (_id: string) => {},
+    focusing: (_on: boolean) => {},
+  };
+  private wasFocusing = false;
+
+  setTask(id: string | null) {
+    this.task = id;
+    keep("manga.focusTask", id);
+    this.changed(false);
+  }
+
   /** Breaks open the rest screen; music follows focus. */
   private afterPhaseChange() {
     const s = this.state;
+    const focusing = s.running && s.mode === "pomodoro" && s.phase === "focus";
+    if (focusing !== this.wasFocusing) {
+      this.wasFocusing = focusing;
+      this.hooks.focusing(focusing);
+    }
     const breakRunning = s.running && (s.phase === "short" || s.phase === "long");
     this.rest(breakRunning && this.settings().rest, s.phase, s.endsAt ?? 0);
     if (this.settings().withFocus && this.music && s.mode === "pomodoro") {

@@ -14,9 +14,10 @@ export type HudItem =
   | { kind: "done"; download: Download; folder: string }
   | { kind: "ring"; ring: Ring; color: string; act: (id: string) => void }
   | { kind: "water"; text: string; drink: () => void }
-  | { kind: "keyboard"; short: string; name: string };
+  | { kind: "keyboard"; short: string; name: string }
+  | { kind: "say"; text: string };
 
-const SECONDS: Record<HudItem["kind"], number> = { lock: 1.6, shot: 6, done: 6, ring: 60, water: 12, keyboard: 1.8 };
+const SECONDS: Record<HudItem["kind"], number> = { lock: 1.6, shot: 6, done: 6, ring: 60, water: 12, keyboard: 1.8, say: 5 };
 
 export class Hud {
   readonly el = el("div", "hud");
@@ -93,6 +94,10 @@ export class Hud {
       });
       text.append(row);
       this.el.append(this.ringFace ?? el("span"), text);
+      return;
+    }
+    if (h.kind === "say") {
+      this.el.append(this.ringFace ?? el("span"), el("span", "hud-say", h.text));
       return;
     }
     if (h.kind === "keyboard") {

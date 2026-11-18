@@ -16,6 +16,7 @@ mod radios;
 mod secrets;
 mod sysinfo;
 mod system;
+mod voice;
 #[cfg(windows)]
 mod winsqlite;
 
@@ -82,6 +83,8 @@ pub fn run() {
             popup::popup_open,
             popup::popup_close,
             popup::pinterest_open,
+            voice::voice_speak,
+            voice::voice_list,
             sysinfo::sysinfo,
             actions::win_state,
             actions::win_action,

@@ -109,6 +109,16 @@ Cada fase termina com o app funcionando, testado e checado contra o Windows.
 - ✅ **Iniciar com o Windows**.
 - Depois: atualização silenciosa assinada.
 
+## Depois das fases ✅
+- **Voz do Manga**: vozes do Windows (feminina ou masculina) ou um servidor de
+  voz no próprio PC (Voice Studio, código aberto); a boca mexe quando fala.
+- **O Manga conhece o seu dia** (se você deixar) e **faz coisas**: tarefas,
+  foco, timer, alarmes, lembretes, música, notas, água, abrir páginas.
+- **O Manga reage**: bateria fraca, CPU alta, foco, meta batida, hora tardia.
+- **Pomodoro**: tarefa da sessão (pomodoros por tarefa, "concluí"), linha de
+  progresso no notch, modo foco (notificações esperam a pausa, apps de
+  distração minimizados).
+
 ## O que não dá para um app separado fazer
 - **Ícones da bandeja dos outros apps**: só quem roda dentro do Explorer (como
   o mod) consegue. A ilha pode abrir a bandeja do Windows.

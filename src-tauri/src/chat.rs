@@ -29,6 +29,9 @@ pub struct ChatRequest {
     pub mode: String,
     pub model: Option<String>,
     pub turns: Vec<Turn>,
+    /// What is going on in the person's day (empty when they turned it off).
+    #[serde(default)]
+    pub context: String,
 }
 
 #[derive(Serialize, Clone)]
@@ -54,10 +57,10 @@ pub fn chat_cancel(id: String) {
 pub async fn chat_send(app: AppHandle, request: ChatRequest) {
     let id = request.id.clone();
     let result = match (request.provider.as_str(), request.mode.as_str()) {
-        ("claude", "subscription") => cli(&app, &id, "claude", &["-p"], &request.turns).await,
-        ("gemini", "subscription") => cli(&app, &id, "gemini", &[], &request.turns).await,
-        ("claude", _) => claude(&app, &id, request.model.as_deref(), &request.turns).await,
-        ("gemini", _) => gemini(&app, &id, request.model.as_deref(), &request.turns).await,
+        ("claude", "subscription") => cli(&app, &id, "claude", &["-p"], &request.turns, &request.context).await,
+        ("gemini", "subscription") => cli(&app, &id, "gemini", &[], &request.turns, &request.context).await,
+        ("claude", _) => claude(&app, &id, request.model.as_deref(), &request.turns, &request.context).await,
+        ("gemini", _) => gemini(&app, &id, request.model.as_deref(), &request.turns, &request.context).await,
         _ => Err("Provedor desconhecido.".to_string()),
     };
     let (error, refused) = match result {
@@ -122,9 +125,9 @@ fn http_error(status: u16, body: &str) -> String {
     }
 }
 
-async fn claude(app: &AppHandle, id: &str, model: Option<&str>, turns: &[Turn]) -> Result<bool, String> {
+async fn claude(app: &AppHandle, id: &str, model: Option<&str>, turns: &[Turn], context: &str) -> Result<bool, String> {
     let key = crate::secrets::get("anthropic").ok_or("Adicione sua chave do Claude nas Configurações.")?;
-    let body = core::claude_body(model.unwrap_or(core::CLAUDE_MODEL), turns);
+    let body = core::claude_body(model.unwrap_or(core::CLAUDE_MODEL), turns, context);
     let resp = client()?
         .post(core::CLAUDE_URL)
         .header("x-api-key", key)
@@ -137,12 +140,12 @@ async fn claude(app: &AppHandle, id: &str, model: Option<&str>, turns: &[Turn]) 
     stream(app, id, resp, core::claude_piece).await
 }
 
-async fn gemini(app: &AppHandle, id: &str, model: Option<&str>, turns: &[Turn]) -> Result<bool, String> {
+async fn gemini(app: &AppHandle, id: &str, model: Option<&str>, turns: &[Turn], context: &str) -> Result<bool, String> {
     let key = crate::secrets::get("gemini").ok_or("Adicione sua chave do Gemini nas Configurações.")?;
     let resp = client()?
         .post(core::gemini_url(model.unwrap_or(core::GEMINI_MODEL)))
         .header("x-goog-api-key", key)
-        .json(&core::gemini_body(turns))
+        .json(&core::gemini_body(turns, context))
         .send()
         .await
         .map_err(|e| format!("Sem conexão com o Gemini: {e}"))?;
@@ -151,7 +154,7 @@ async fn gemini(app: &AppHandle, id: &str, model: Option<&str>, turns: &[Turn]) 
 
 /// The Claude Code or Gemini CLI, signed in with the user's own account:
 /// the conversation goes in on stdin, the answer comes out as it is written.
-async fn cli(app: &AppHandle, id: &str, tool: &str, args: &[&str], turns: &[Turn]) -> Result<bool, String> {
+async fn cli(app: &AppHandle, id: &str, tool: &str, args: &[&str], turns: &[Turn], context: &str) -> Result<bool, String> {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     let mut cmd = if cfg!(windows) {
         // npm installs them as .cmd shims: cmd finds them on the PATH.
@@ -173,7 +176,7 @@ async fn cli(app: &AppHandle, id: &str, tool: &str, args: &[&str], turns: &[Turn
         .spawn()
         .map_err(|_| format!("Não encontrei o {tool} neste PC. Instale e faça login, ou use uma chave."))?;
     if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(core::transcript(turns).as_bytes()).await.map_err(|e| e.to_string())?;
+        stdin.write_all(core::transcript(turns, context).as_bytes()).await.map_err(|e| e.to_string())?;
     }
     let mut out = child.stdout.take().ok_or("sem saída")?;
     let mut buf = [0u8; 4096];
