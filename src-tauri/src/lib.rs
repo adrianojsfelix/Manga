@@ -1,5 +1,6 @@
 // Manga: an island at the top of Windows.
 
+mod about;
 mod actions;
 mod audio;
 mod brightness;
@@ -31,6 +32,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             island::island_layout,
             island::island_focus,
+            about::app_version,
+            about::update_check,
+            about::autostart_get,
+            about::autostart_set,
             island::monitors,
             island::island_monitor,
             island::island_visible,

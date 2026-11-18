@@ -51,6 +51,8 @@ export interface Settings {
   /** The clipboard's history is kept (in memory only). */
   clipboard: boolean;
   look: LookPrefs;
+  /** Look for a new version once a day. */
+  updates: boolean;
   day: {
     /** The weather's city. */
     place: Place | null;
@@ -137,6 +139,7 @@ export const DEFAULT_SETTINGS: Settings = {
   controls: DEFAULT_CONTROLS,
   clipboard: true,
   look: DEFAULT_LOOK,
+  updates: true,
   day: { place: null, calendars: [], water: DEFAULT_WATER },
   tools: { feeds: DEFAULT_FEEDS, pins: [] },
 };
@@ -180,6 +183,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     controls: Array.isArray(r.controls) ? [...new Set(r.controls.filter((c): c is string => typeof c === "string"))].slice(0, 30) : d.controls,
     clipboard: typeof r.clipboard === "boolean" ? r.clipboard : d.clipboard,
     look: sanitizeLook(r.look),
+    updates: typeof r.updates === "boolean" ? r.updates : d.updates,
     day: {
       place: placeOf(obj(r.day).place),
       calendars: strings(obj(r.day).calendars, []).filter((u) => /^(https|webcal):\/\//.test(u)),

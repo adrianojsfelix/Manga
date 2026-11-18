@@ -34,6 +34,11 @@ export const Bridge = {
   layout: (width: number, height: number) => call<void>("island_layout", { width, height }),
   /** Lets the island take the keyboard (a text field) or gives it back. */
   focus: (on: boolean) => call<void>("island_focus", { on }),
+  appVersion: () => call<string>("app_version"),
+  /** The newest release on GitHub when newer; null when up to date. */
+  updateCheck: () => invokeOrError<Release | null>("update_check"),
+  autostartGet: () => call<boolean>("autostart_get"),
+  autostartSet: (on: boolean) => call<boolean>("autostart_set", { on }),
   monitors: () => call<{ index: number; name: string; width: number; height: number; primary: boolean }[]>("monitors"),
   islandMonitor: (choice: string) => call<void>("island_monitor", { choice }),
   islandVisible: (on: boolean) => call<void>("island_visible", { on }),
@@ -97,6 +102,14 @@ export const Bridge = {
     call<void>("popup_open", { label, page: `${label}.html`, data, width, height, place }),
   popupClose: (label: "alert" | "rest") => call<void>("popup_close", { label }),
 };
+
+export interface Release {
+  version: string;
+  notes: string;
+  page: string;
+  installer: string | null;
+  installerName: string | null;
+}
 
 export interface Keyboard {
   layouts: { id: number; locale: string; short: string; name: string }[];

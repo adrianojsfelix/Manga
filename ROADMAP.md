@@ -103,7 +103,11 @@ Cada fase termina com o app funcionando, testado e checado contra o Windows.
 - Depois: arrastar para ordenar, uma ilha em cada monitor.
 
 ## Fase 8 — Instalador e atualizações
-- Instalador para Windows e aviso de versão nova pelo GitHub.
+- ✅ **Instalador** NSIS para o seu usuário (sem administrador), em português.
+- ✅ **Versões no GitHub**: uma tag `v*` gera e publica o instalador (Actions).
+- ✅ **Aviso de versão nova** uma vez por dia; baixar e instalar pela ilha.
+- ✅ **Iniciar com o Windows**.
+- Depois: atualização silenciosa assinada.
 
 ## O que não dá para um app separado fazer
 - **Ícones da bandeja dos outros apps**: só quem roda dentro do Explorer (como

@@ -1056,3 +1056,8 @@ body.light-island .head, body.light-island .small-center, body.light-island .hea
 .profile .chip { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .profile-del { height: 24px; padding: 0 7px; border: 1px solid rgba(255, 255, 255, 0.1); border-left: 0; border-radius: 0 999px 999px 0; background: transparent; color: var(--dim); }
 .profile-del:hover { color: #f4505e; }
+.about-head { display: flex; align-items: baseline; gap: 10px; }
+.about-head b { font-size: 18px; }
+.set-note.ok { color: #6fd39b; }
+.update-card { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--accent) 14%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+.update-notes { margin: 0; max-height: 90px; overflow: auto; font: 11.5px/1.45 var(--font); color: var(--dim); white-space: pre-wrap; }

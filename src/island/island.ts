@@ -343,6 +343,9 @@ export class Island {
       void Bridge.islandVisible(!(full && this.settings.look.fullscreen === "hide"));
     });
     void Bridge.islandMonitor(settings.look.monitor);
+    // A new version, looked for once a day (after a minute, not to slow the start).
+    window.setTimeout(() => void this.lookForUpdate(), 60_000);
+    window.setInterval(() => void this.lookForUpdate(), 6 * 3600_000);
     this.applyLook();
     this.toolsView = new ToolsView(
       () => this.settings.tools,
@@ -521,6 +524,23 @@ export class Island {
     this.slotR.replaceChildren(...(right ? [right] : []));
     // The count by the time only when the user wants notifications there.
     this.countBadge.hidden = !this.items.small.includes("notifications");
+  }
+
+  private async lookForUpdate() {
+    if (!this.settings.updates || !IN_APP) return;
+    let last = 0;
+    try {
+      last = Number(localStorage.getItem("manga.updateCheckedAt")) || 0;
+      if (Date.now() - last < 24 * 3600_000) return;
+      localStorage.setItem("manga.updateCheckedAt", String(Date.now()));
+    } catch {
+      /* storage off */
+    }
+    const r = await Bridge.updateCheck();
+    if ("ok" in r && r.ok) {
+      this.kumo.flash("proud", 2);
+      this.notify({ id: -Date.now(), app: "Manga", title: t("Manga {v} is out!", { v: r.ok.version }), body: t("Settings → About to install."), at: Date.now() });
+    }
   }
 
   /** Files dragged over the island open the shelf; dropped, they stay there. */

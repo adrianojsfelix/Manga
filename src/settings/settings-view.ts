@@ -3,7 +3,7 @@
 // The keys go straight to Windows' Credential Manager; this page only learns
 // whether one is saved.
 
-import { Bridge, IN_APP, type CcStatus, type SecretName } from "../core/bridge.ts";
+import { Bridge, IN_APP, type CcStatus, type Release, type SecretName } from "../core/bridge.ts";
 import type { Session } from "../claude-code/sessions.ts";
 import { t } from "../core/i18n.ts";
 import type { Provider, Settings } from "../core/settings.ts";
@@ -18,7 +18,7 @@ import { saveProfile, type LookPrefs, type Profile } from "../core/look.ts";
 import type { Page } from "../core/island-state.ts";
 import { BUILT_PHASE, ITEMS, type ItemId, type ItemPrefs } from "../items/registry.ts";
 
-type Tab = "assistant" | "claude" | "focus" | "day" | "notifications" | "island" | "look";
+type Tab = "assistant" | "claude" | "focus" | "day" | "notifications" | "island" | "look" | "about";
 
 const SECRET: Record<Provider, SecretName> = { claude: "anthropic", gemini: "gemini" };
 const AI: { id: Provider; name: string; keyHint: string; model: string; cli: string }[] = [
@@ -58,7 +58,7 @@ export class SettingsView {
 
   paint() {
     const tabs = el("div", "set-tabs");
-    for (const [id, label] of [["assistant", "Assistant"], ["claude", "Claude Code"], ["focus", "Focus"], ["day", "The day"], ["notifications", "Notifications"], ["island", "Island"], ["look", "Appearance"]] as [Tab, string][]) {
+    for (const [id, label] of [["assistant", "Assistant"], ["claude", "Claude Code"], ["focus", "Focus"], ["day", "The day"], ["notifications", "Notifications"], ["island", "Island"], ["look", "Appearance"], ["about", "About"]] as [Tab, string][]) {
       const b = el("button", `set-tab${this.tab === id ? " on" : ""}`, t(label));
       b.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -73,6 +73,7 @@ export class SettingsView {
     else if (this.tab === "focus") this.focus(body);
     else if (this.tab === "day") this.dayTab(body);
     else if (this.tab === "look") this.lookTab(body);
+    else if (this.tab === "about") this.aboutTab(body);
     else if (this.tab === "notifications") this.notifications(body);
     else this.island(body);
     this.el.replaceChildren(tabs, body);
@@ -391,6 +392,104 @@ export class SettingsView {
     });
     prof.append(this.row(t("New profile"), this.profileName, save));
     body.append(prof);
+  }
+
+  private version = "";
+  private autostart: boolean | null = null;
+  private update: Release | null | undefined = undefined;
+  private updateError = "";
+  private checking = false;
+
+  private async checkUpdate() {
+    this.checking = true;
+    this.paint();
+    if (!IN_APP) {
+      this.update = null;
+    } else {
+      const r = await Bridge.updateCheck();
+      if ("error" in r) {
+        this.updateError = r.error;
+        this.update = undefined;
+      } else {
+        this.updateError = "";
+        this.update = r.ok;
+      }
+      try {
+        localStorage.setItem("manga.updateCheckedAt", String(Date.now()));
+      } catch {
+        /* storage off */
+      }
+    }
+    this.checking = false;
+    this.paint();
+  }
+
+  private aboutTab(body: HTMLElement) {
+    const s = this.settings();
+    if (!this.version) {
+      void Promise.all([Bridge.appVersion(), Bridge.autostartGet()]).then(([v, a]) => {
+        this.version = v ?? "0.8.0";
+        this.autostart = a;
+        this.paint();
+      });
+    }
+    const box = el("div", "set-box about");
+    const head = el("div", "about-head");
+    head.append(el("b", "", "Manga"), el("span", "set-note", this.version ? `${t("version")} ${this.version}` : ""));
+    box.append(head, el("p", "set-note", t("An island at the top of Windows. Your keys stay in Windows' Credential Manager; nothing is sent anywhere but where you ask (the AIs, the weather, your calendars, feeds and boards).")));
+    box.append(
+      this.row(
+        t("Start with Windows"),
+        this.segmented(this.autostart ? "on" : "off", [["on", t("On")], ["off", t("Off")]], (v) => {
+          void Bridge.autostartSet(v === "on").then(() => Bridge.autostartGet().then((a) => ((this.autostart = a), this.paint())));
+        }),
+      ),
+    );
+    body.append(box);
+
+    const up = el("div", "set-box");
+    up.append(el("div", "set-title", t("Updates")));
+    const check = el("button", "set-btn", this.checking ? t("Looking…") : t("Look for a new version"));
+    check.disabled = this.checking;
+    check.addEventListener("click", (e) => {
+      e.stopPropagation();
+      void this.checkUpdate();
+    });
+    up.append(
+      this.row(t("Look once a day"), this.segmented(s.updates ? "on" : "off", [["on", t("On")], ["off", t("Off")]], (v) => this.change({ updates: v === "on" }))),
+      this.row("", check),
+    );
+    if (this.updateError) up.append(el("p", "set-note error", this.updateError));
+    if (this.update === null) up.append(el("p", "set-note ok", t("You have the newest version.")));
+    if (this.update) {
+      const u = this.update;
+      const card = el("div", "update-card");
+      card.append(el("b", "", t("Manga {v} is out!", { v: u.version })));
+      if (u.notes) card.append(el("pre", "update-notes", u.notes.slice(0, 600)));
+      const row = el("div", "f-row");
+      if (u.installer) {
+        const get = el("button", "set-btn", t("Download and install"));
+        get.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const r = await Bridge.downloadUrl(u.installer!);
+          this.updateError = "error" in r ? r.error : "";
+          if (!("error" in r)) get.textContent = t("Downloading… open it when it finishes");
+          get.disabled = true;
+        });
+        row.append(get);
+      }
+      if (u.page) {
+        const page = el("button", "set-btn quiet", t("See what changed"));
+        page.addEventListener("click", (e) => {
+          e.stopPropagation();
+          void Bridge.openUrl(u.page);
+        });
+        row.append(page);
+      }
+      card.append(row);
+      up.append(card);
+    }
+    body.append(up);
   }
 
   private places: Place[] = [];

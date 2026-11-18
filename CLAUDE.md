@@ -1,8 +1,8 @@
 # Manga — guia para agentes de código
 
 Manga é uma ilha no topo do Windows (Tauri 2: Rust em `src-tauri/`,
-TypeScript em `src/`). O mascote é o **Kumo**, desenhado em código
-(`src/mascot/kumo.ts`). O plano por fases está em `ROADMAP.md`.
+TypeScript em `src/`). O mascote se chama **Manga**, desenhado em código
+(`src/mascot/kumo.ts`; "Kumo" é só o nome interno da classe). O plano por fases está em `ROADMAP.md`.
 
 ## Regras
 - Projeto escrito do zero. Não copiar código, nome, desenhos nem sons do

@@ -1,7 +1,7 @@
 {
   "name": "manga",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.8.0",
   "type": "module",
   "description": "An island at the top of Windows: a bot assistant (Claude and Gemini), Windows' controls, media, focus and the day at a glance.",
   "scripts": {
