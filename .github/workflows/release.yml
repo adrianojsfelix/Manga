@@ -1,5 +1,6 @@
-# A tag "v0.9.0" builds the Windows installer and publishes it as a GitHub
-# release; Manga finds it in Settings → About.
+# Builds the Windows installer and publishes it as a GitHub release; Manga
+# finds it in Settings → About. Runs on a tag "v0.9.0", or by hand (Actions →
+# Release → Run workflow), which tags the version in package.json.
 name: Release
 
 on:
@@ -25,8 +26,22 @@ jobs:
       - run: npm test
       - run: cargo test -p manga-core
       - run: npx tauri build
+      - name: The version
+        id: version
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT";
+          else echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"; fi
+      - name: Keep the installer (also downloadable from the run's page)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Manga-installer
+          path: target/release/bundle/nsis/*-setup.exe
       - name: Publish the installer
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Manga ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           files: target/release/bundle/nsis/*-setup.exe
           generate_release_notes: true
